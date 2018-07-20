@@ -33,8 +33,13 @@ echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
 echo "\"" >> ${config}
 echo "## 輸入與輸出" >> ${config}
 echo "Input_Data=*.COR" >> ${config}
-echo "Output_File=GMT_GPS_ts_plot" >> ${config}
+echo "Output_File=GMT_GPS" >> ${config}
+echo "## 輸出圖檔格式，支援JPG、PNG、PDF、TIFF、BMP、EPS、PPM、SVG" >> ${config}
 echo "Output_Figure_Format=PNG" >> ${config}
+echo "## 自動裁切空白的部分" >> ${config}
+echo "Output_Figure_Adjust=true" >> ${config}
+echo "## PNG圖檔背景是否為透明" >> ${config}
+echo "Output_Figure_Transparent=false" >> ${config}
 echo "" >> ${config}
 echo "# Basemap setting" >> ${config}
 echo "## 設定底圖範圍" >> ${config}

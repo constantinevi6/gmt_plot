@@ -52,7 +52,7 @@ echo "Input_Data_date=${Input_Data_date}" >> ${config}
 echo "Input_Data_lonlat=ps_ll.txt" >> ${config}
 echo "Input_Data=ps_u-dm.*.xy" >> ${config}
 echo "## 輸出選項" >> ${config}
-echo "Output_File=GMT_PS_ts_plot" >> ${config}
+echo "Output_File=GMT_PS" >> ${config}
 echo "## 輸出圖檔格式，支援JPG、PNG、PDF、TIFF、BMP、EPS、PPM、SVG" >> ${config}
 echo "Output_Figure_Format=PNG" >> ${config}
 echo "## 自動裁切空白的部分" >> ${config}
