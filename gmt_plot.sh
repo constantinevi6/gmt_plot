@@ -139,9 +139,24 @@ function config_psxy(){
     echo "## 設定資料點樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
     echo "psxy_Size=0.02" >> ${config}
     echo "psxy_Type=c" >> ${config}
+    echo "psxy_G=black" >> ${config}
     echo "## 設定Colorbar，格式=[最小值]/[最大值]/[變色間隔]" >> ${config}
     echo "psxy_makecpt=${min_cpt}/${max_cpt}/1" >> ${config}
     echo "psxy_makecpt_color=jet" >> ${config}
+    echo "" >> ${config}
+}
+
+function config_psxy_baseline(){
+    echo "# psxy setting" >> ${config}
+    echo "## 設定資料點樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
+    echo "psxy_Size=0.02" >> ${config}
+    echo "psxy_Type=c" >> ${config}
+    echo "psxy_G=black" >> ${config}
+    echo "## 設定主影像資料點樣式與大小" >> ${config}
+    echo "M_psxy_Size=c0.4" >> ${config}
+    echo "M_psxy_G=red" >> ${config}
+    echo "## 設定連線樣式" >> ${config}
+    echo "psxy_W=2p,gray" >> ${config}
     echo "" >> ${config}
 }
 
@@ -213,7 +228,7 @@ function config_default_ts(){
     Map_Projection=X
 }
 
-function define_edge_ts(){
+function define_edge(){
     gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
     Edge_Left=`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
     Edge_Right=`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
@@ -406,13 +421,15 @@ function plot_bl(){
         config_gereral
         config_io
         config_basemap
-        config_image
-        config_psxy
-        config_scale
-        config_title
+        config_psxy_baseline
         exit 1
     fi
     source ${pwd}/${config}
+    setting_config
+    gmt gmtset ${gmt_config}
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
+    
+    gmt psxy -R -J -T -O >> ${Output_File}
 }
 
 # 讀取設定檔
