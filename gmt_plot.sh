@@ -81,7 +81,7 @@ function config_io(){
     echo "Input_Bperp=${Input_Bperp}" >> ${config}
     echo "Input_LonLat=${Input_LonLat}" >> ${config}
     echo "## 輸出選項" >> ${config}
-    echo "Output_File=GMT_v" >> ${config}
+    echo "Output_File=GMT_${mode}" >> ${config}
     echo "## 輸出圖檔格式，支援JPG、PNG、PDF、TIFF、BMP、EPS、PPM、SVG" >> ${config}
     echo "Output_Figure_Format=PNG" >> ${config}
     echo "## 自動裁切空白的部分" >> ${config}
@@ -226,14 +226,20 @@ function config_default_v(){
 
 function config_default_ts(){
     Map_Projection=X
+    Map_Width=9
+    Map_High=6
+    Map_Bax=1
+    Map_Bbx=3
+    Map_Bay=50
+    Map_Bby=10
 }
 
 function define_edge(){
     gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
-    Edge_Left=`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
-    Edge_Right=`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
-    Edge_Lower=`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
-    Edge_Upper=`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
+    Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
+    Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
+    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
+    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
 }
 
 function define_edge_geo(){
@@ -413,6 +419,9 @@ function plot_ts(){
 }
 
 function plot_bl(){
+    Input_X=${Input_Date}
+    Input_Y=${Input_Bperp}
+    define_edge
     config_default_ts
     if [ ! -f "${config}" ];then
         echo "Please setup ${config} for input."
@@ -427,8 +436,30 @@ function plot_bl(){
     source ${pwd}/${config}
     setting_config
     gmt gmtset ${gmt_config}
-    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx1Y -Bpxa3Of1o -Bpy200 ${X} ${Y} -K -V > ${Output_File}
+    Identify=`cat ${Input_Date} | awk '{printf($2)}'`
+    Date_Count=`wc -l ${Input_Date} | awk '{print $1}'`
+    BperpArray=(`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}'`)
     
+    if [ -z "${Identify}" ];then
+        DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
+        for (( i=0; i<${Date_Count}; i=i+1 ))
+        do
+            echo "${BperpArray[${i}]} ${DateArray[${i}]}"
+            if [ "${BperpArray[${i}]}" -eq 0 ];then
+                Master=${DateArray[${i}]}
+                echo "Master image is ${Master}."
+            fi
+        done
+        for (( i=0; i<${Date_Count}; i=i+1 ))
+        do
+            echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -Fr${master}/0 -W${psxy_W} -O -K >> ${Output_File_Name}
+        done
+    else
+        MasterDatesArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
+        SlaveDatesArray=(`cat ${Input_Date} | awk '{printf("%d\n",$2)}' | gmt gmtconvert -fT`)
+        Dates=${MasterDates}" "${SlaveDates}
+    fi
     gmt psxy -R -J -T -O >> ${Output_File}
 }
 
