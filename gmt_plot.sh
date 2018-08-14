@@ -281,6 +281,7 @@ function plot_image(){
         #    sed -i 's/Make_Shade=true/Make_Shade=false/g' ${config}
         #fi
         # 將DEM底圖加上灰階
+        gmt grdgradient ${Image_Output} -Gshade.grd -A0 -Ne0.6 -V
         gmt makecpt -C${Image_makecpt_color} -T${Image_makecpt} -Z > image_cpt.cpt
         gmt grdimage ${Image_Output} -Cimage_cpt.cpt -Ishade.grd -J -R -K -O -P -V >> ${Output_File}
     elif [ "${Image_Type}" == "IFG" ];then
