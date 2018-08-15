@@ -8,10 +8,16 @@ function help(){
     echo "This is a help information."
 }
 
+function help_config(){
+    echo "Please setup ${config} for input."
+    echo
+}
+
 function define_io(){
     Input_Data=ps_mean_v.xy
     Input_Date=date.txt
     Input_Bperp=bperp.txt
+    Input_SBAS=small_baselines.list
     Input_LonLat=ps_ll.txt
 }
 
@@ -24,6 +30,7 @@ function define_configure(){
 }
 
 function config_gereral(){
+    echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
     echo "# General setting" >> ${config}
     echo "## FORMAT_GEO_MAP 地圖邊框座標格式" >> ${config}
     echo "## MAP_FRAME_TYPE 地圖邊框形式，plain=細框，fancy=斑馬紋粗框" >> ${config}
@@ -79,9 +86,10 @@ function config_io(){
     echo "Input_Data=${Input_Data}" >> ${config}
     echo "Input_Date=${Input_Date}" >> ${config}
     echo "Input_Bperp=${Input_Bperp}" >> ${config}
+    echo "Input_SBAS=${Input_SBAS}" >> ${config}
     echo "Input_LonLat=${Input_LonLat}" >> ${config}
     echo "## 輸出選項" >> ${config}
-    echo "Output_File=GMT_${mode}" >> ${config}
+    echo "Output_File_Name=GMT_${mode}" >> ${config}
     echo "## 輸出圖檔格式，支援JPG、PNG、PDF、TIFF、BMP、EPS、PPM、SVG" >> ${config}
     echo "Output_Figure_Format=PNG" >> ${config}
     echo "## 自動裁切空白的部分" >> ${config}
@@ -194,29 +202,6 @@ function config_title(){
     echo "Title=\"\"" >> ${config}
 }
 
-function config_ddd(){
-    exit
-}
-
-function setting_config(){
-    Output_File=${Output_File}.ps
-    Image_Output=${Image_Output}_${Image_Type}.tif
-    psbasemap_J=${Map_Projection}${Map_Width}${Map_Width_unit}
-    if [ ! -z "${Map_High}" ];then
-        psbasemap_J=${psbasemap_J}/${Map_High}${Map_Width_unit}
-    fi
-    psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
-    psbasemap_By=a${Map_Bay}b${Map_Bby}
-    if [ "${Map_Offset_X}" != "" ];then
-        X=-X${Map_Offset_X}
-    fi
-    if [ "${Map_Offset_Y}" != "" ];then
-        Y=-Y${Map_Offset_Y}
-    fi
-    psxy_S=${psxy_Type}${psxy_Size}
-    scale_B=a${scale_Ba}f${scale_Bf}
-}
-
 function config_default_v(){
     Map_Projection=M
     Map_Width=6
@@ -234,7 +219,54 @@ function config_default_ts(){
     Map_Bby=10
 }
 
+function config_ddd(){
+    exit
+}
+
+function setting_config(){
+    source ${pwd}/${config}
+    gmt gmtset ${gmt_config}
+}
+
+function setting_output(){
+    if [ $# -eq 0 ];then
+        Output_File=${Output_File_Name}.ps
+    else
+        Output_File=${Output_File_Name}
+        argvs=$@
+        for argv in ${argvs}
+        do
+            Output_File=${Output_File}_${argv}
+        done
+        Output_File=${Output_File}.ps
+    fi
+}
+
+function setting_argument(){
+    psbasemap_J=${Map_Projection}${Map_Width}${Map_Width_unit}
+    if [ ! -z "${Map_High}" ];then
+        psbasemap_J=${psbasemap_J}/${Map_High}${Map_Width_unit}
+    fi
+    psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
+    psbasemap_By=a${Map_Bay}b${Map_Bby}
+    if [ "${Map_Offset_X}" != "" ];then
+        X=-X${Map_Offset_X}
+    fi
+    if [ "${Map_Offset_Y}" != "" ];then
+        Y=-Y${Map_Offset_Y}
+    fi
+    psxy_S=${psxy_Type}${psxy_Size}
+    scale_B=a${scale_Ba}f${scale_Bf}
+}
+
 function define_edge(){
+    Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
+    Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
+    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
+    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
+}
+
+function define_edge_time(){
     gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
     Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
     Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
@@ -255,6 +287,7 @@ function define_edge_cpt(){
 }
 
 function crop_image(){
+    Image_Output=${Image_Output}_${Image_Type}.tif
     if [ -f "${Image_Output}" ];then
         basemap_crop_xmin=`grdinfo ${Image_Output} | grep 'x_min' | awk '{print $3}'`
         basemap_crop_xmax=`grdinfo ${Image_Output} | grep 'x_min' | awk '{print $5}'`
@@ -338,15 +371,13 @@ function convert_fig(){
 }
 
 function plot_v(){
-    # 計算所需參數
-    define_edge_geo
-    define_edge_cpt
-    config_default_v
     # 產生Configure
     if [ ! -f "${config}" ];then
-        echo "Please setup ${config} for input."
-        echo
-        echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
+        define_edge_geo
+        define_edge_cpt
+        config_default_v
+
+        help_config
         config_gereral
         config_io
         config_basemap
@@ -358,10 +389,9 @@ function plot_v(){
     fi
 
     # 載入參數
-    source ${pwd}/${config}
     setting_config
-    gmt gmtset ${gmt_config}
-
+    setting_argument
+    setting_output
     # 底圖設定
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
@@ -377,16 +407,17 @@ function plot_v(){
 
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
 }
 
 function plot_d(){
-    define_edge_geo
-    define_edge_cpt
-    config_default_v
+
     if [ ! -f "${config}" ];then
-        echo "Please setup ${config} for input."
-        echo
-        echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
+        define_edge_geo
+        define_edge_cpt
+        config_default_v
+
+        help_config
         config_gereral
         config_io
         config_basemap
@@ -401,11 +432,9 @@ function plot_d(){
 }
 
 function plot_ts(){
-    config_default_ts
     if [ ! -f "${config}" ];then
-        echo "Please setup ${config} for input."
-        echo
-        echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
+        config_default_ts
+        help_config
         config_gereral
         config_io
         config_basemap
@@ -422,46 +451,89 @@ function plot_ts(){
 function plot_bl(){
     Input_X=${Input_Date}
     Input_Y=${Input_Bperp}
-    define_edge
-    config_default_ts
     if [ ! -f "${config}" ];then
+        define_edge_time
         echo "Please setup ${config} for input."
         echo
         echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
+        config_default_ts
         config_gereral
         config_io
         config_basemap
         config_psxy_baseline
         exit 1
     fi
-    source ${pwd}/${config}
     setting_config
-    gmt gmtset ${gmt_config}
-    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx1Y -Bpxa3Of1o -Bpy200 ${X} ${Y} -K -V > ${Output_File}
-    Identify=`cat ${Input_Date} | awk '{printf($2)}'`
-    Date_Count=`wc -l ${Input_Date} | awk '{print $1}'`
+    setting_argument
+    setting_output
+    Imgs_Count=`wc -l ${Input_Date} | awk '{print $1}'`
     BperpArray=(`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}'`)
+    DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
     
-    if [ -z "${Identify}" ];then
-        DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
-        for (( i=0; i<${Date_Count}; i=i+1 ))
-        do
-            echo "${BperpArray[${i}]} ${DateArray[${i}]}"
-            if [ "${BperpArray[${i}]}" -eq 0 ];then
-                Master=${DateArray[${i}]}
-                echo "Master image is ${Master}."
-            fi
-        done
-        for (( i=0; i<${Date_Count}; i=i+1 ))
-        do
-            echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -Fr${master}/0 -W${psxy_W} -O -K >> ${Output_File_Name}
-        done
-    else
-        MasterDatesArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
-        SlaveDatesArray=(`cat ${Input_Date} | awk '{printf("%d\n",$2)}' | gmt gmtconvert -fT`)
-        Dates=${MasterDates}" "${SlaveDates}
-    fi
+    gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx1Y -Bpxa3Of1o -Bpy200 ${X} ${Y} -K -V > ${Output_File}
+    cp ${Output_File} temp.ps
+
+    echo "DInSAR"
+    setting_output dinsar
+    cp temp.ps ${Output_File}
+    Ifgs_Count=`wc -l ${Input_Bperp} | awk '{print $1}'`
+    for (( i=0; i<${Ifgs_Count}; i=i+1 ))
+    do
+        if [ "${BperpArray[${i}]}" -eq 0 ];then
+            Master=${DateArray[${i}]}
+            echo "Master image is ${Master}."
+        fi
+    done
+    for (( i=0; i<${Ifgs_Count}; i=i+1 ))
+    do
+        echo "${DateArray[${i}]} ${BperpArray[${i}]}"
+        echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -Fr${Master}/0 -W${psxy_W} -O -K >> ${Output_File}
+    done
+    for (( i=0; i<${Imgs_Count}; i=i+1 ))
+    do
+        if [ "${DateArray[${i}]}" == "${Master}" ];then
+            echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -S${M_psxy_Size} -G${M_psxy_G} -O -K >> ${Output_File}
+        else
+            echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -S${psxy_Size} -G${psxy_G} -O -K >> ${Output_File}
+        fi
+    done
     gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
+    
+    if [ -f "${Input_SBAS}" ];then
+        echo "SBAS"
+        setting_output sbas
+        cp temp.ps ${Output_File}
+        gmt gmtset FORMAT_DATE_IN yyyymmdd
+        Ifgs_Count=`wc -l ${Input_SBAS} | awk '{print $1}'`
+        MasterDatesArray=(`cat ${Input_SBAS} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
+        SlaveDatesArray=(`cat ${Input_SBAS} | awk '{printf("%d\n",$2)}' | gmt gmtconvert -fT`)
+        gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
+        Dates=${MasterDates}" "${SlaveDates}
+        for (( i=0; i<${Ifgs_Count}; i=i+1 ))
+        do
+            MasterDate=${MasterDatesArray[${i}]}
+            SlaveDate=${SlaveDatesArray[${i}]}
+            for (( j=0; j<${Imgs_Count}; j=j+1 ))
+            do
+                if [ "${MasterDate}" == "${DateArray[${j}]}" ];then
+                    MasterBperp=${BperpArray[${j}]}
+                elif [ "${SlaveDate}" == "${DateArray[${j}]}" ];then
+                    SlaveBperp=${BperpArray[${j}]}
+                fi
+            done
+            echo "${MasterDate} ${SlaveDate}"
+            echo ${SlaveDate} ${SlaveBperp} | gmt psxy -R -J -Fr${MasterDate}/${MasterBperp} -W${psxy_W} -O -K >> ${Output_File}
+        done
+        for (( i=0; i<${Imgs_Count}; i=i+1 ))
+        do
+            echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -S${psxy_Size} -G${psxy_G} -O -K >> ${Output_File}
+        done
+        gmt psxy -R -J -T -O >> ${Output_File}
+        convert_fig
+    fi
+    rm temp.ps
 }
 
 # 讀取設定檔
@@ -484,4 +556,3 @@ elif [ "${mode}" == "ts" ];then
 elif [ "${mode}" == "bl" ];then
     plot_bl
 fi
-convert_fig
