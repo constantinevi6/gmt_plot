@@ -213,7 +213,7 @@ function config_default_ts(){
     Map_Projection=X
     Map_Width=9
     Map_High=6
-    Map_Bax=10
+    Map_Bax=1
     Map_Bbx=3
     Map_Bay=50
     Map_Bby=10
