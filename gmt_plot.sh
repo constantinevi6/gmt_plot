@@ -205,7 +205,7 @@ function config_title(){
 function config_default_v(){
     Map_Projection=M
     Map_Width=6
-    Map_Offset_X=4
+    Map_Offset_Y=4
     Map_Bax=1
     Map_Bbx=0.2
     Map_Bay=1
