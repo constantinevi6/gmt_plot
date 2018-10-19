@@ -125,31 +125,29 @@ function config_basemap(){
 }
 
 function config_image(){
-    echo "# Image setting" >> ${config}
+    echo "# Basemap setting" >> ${config}
     echo "## 是否繪製底圖" >> ${config}
-    echo "Plot_Image=false" >> ${config}
+    echo "Plot_Basemap=false" >> ${config}
     echo "## 輸入底圖的絕對路徑" >> ${config}
-    echo "Image=" >> ${config}
+    echo "Basemap=" >> ${config}
     echo "## 底圖類型，DEM=數值地形模型，IFG=差分干涉圖，IMG=多光譜影像" >> ${config}
-    echo "Image_Type=DEM" >> ${config}
+    echo "Basemap_Type=DEM" >> ${config}
     echo "## 輸出底圖名稱" >> ${config}
-    echo "Image_Output=image_crop" >> ${config}
-    echo "## 是否重新計算DEM陰影" >> ${config}
-    echo "Image_Make_Shade=true" >> ${config}
+    echo "Basemap_Output=Basemap_crop" >> ${config}
     echo "## 設定DEM/IFG色帶樣式，gray=灰階，jet=彩虹" >> ${config}
-    echo "Image_makecpt_color=" >> ${config}
+    echo "Basemap_makecpt_color=" >> ${config}
     echo "## 設定DEM/IFG色帶，格式=[最小值]/[最大值]/[變色間隔]" >> ${config}
-    echo "Image_makecpt=-1000/1000/1" >> ${config}
+    echo "Basemap_makecpt=" >> ${config}
 }
 
-function config_psxy(){
+function config_psxy_PS(){
     echo "# psxy setting" >> ${config}
     echo "## 設定資料點樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
     echo "psxy_Size=0.02" >> ${config}
     echo "psxy_Type=c" >> ${config}
-    echo "psxy_G=black" >> ${config}
+    echo "psxy_G=" >> ${config}
     echo "## 設定Colorbar，格式=[最小值]/[最大值]/[變色間隔]" >> ${config}
-    echo "psxy_makecpt=${min_cpt}/${max_cpt}/1" >> ${config}
+    echo "psxy_makecpt=-${cpt}/${cpt}/0.01" >> ${config}
     echo "psxy_makecpt_color=jet" >> ${config}
     echo "" >> ${config}
 }
@@ -180,20 +178,19 @@ function config_scale(){
 
 function config_addition_layer(){
     echo "# 額外圖層" >> ${config}
+    echo "## 額外圖層檔案,大小/樣式,顏色(,填充顏色)" >> ${config}
     echo "Addition_Layers=\"" >> ${config}
     echo "\"" >> ${config}
-    echo "## 設定點樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
+    echo "## 設定點預設樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
     echo "Layer_Point_Size=" >> ${config}
     echo "Layer_Point_Color=" >> ${config}
-    echo "## 設定線寬度與顏色" >> ${config}
+    echo "## 設定線預設寬度[p]與顏色" >> ${config}
     echo "Layer_Line_Size=" >> ${config}
     echo "Layer_Line_Color=" >> ${config}
-    echo "## 設定多邊形樣式" >> ${config}
+    echo "## 設定多邊形預設樣式" >> ${config}
     echo "## 設定多邊形邊線寬與顏色" >> ${config}
     echo "Layer_Polygon_Line_Size=" >> ${config}
     echo "Layer_Polygon_Line_Color=" >> ${config}
-    echo "## 設定多邊形填充顏色" >> ${config}
-    echo "Layer_Polygon_Color=" >> ${config}
     echo "" >> ${config}
 }
 
@@ -288,44 +285,56 @@ function define_edge_geo(){
 function define_edge_cpt(){
     max_cpt=`cat ${Input_Data} | awk '{printf("%f\n",$3)}' | gmt info -I10 -C | cut -f2`
     min_cpt=`cat ${Input_Data} | awk '{printf("%f\n",$3)}' | gmt info -I10 -C | cut -f1`
+    max_cpt_abs=`gmt math -Q ${max_cpt} ABS =`
+    min_cpt_abs=`gmt math -Q ${min_cpt} ABS =`
+    cpt=`gmt math -Q ${max_cpt_abs} ${min_cpt_abs} MAX =`
 }
 
 function crop_image(){
-    Image_Output=${Image_Output}_${Image_Type}.tif
-    if [ -f "${Image_Output}" ];then
-        basemap_crop_xmin=`grdinfo ${Image_Output} | grep 'x_min' | awk '{print $3}'`
-        basemap_crop_xmax=`grdinfo ${Image_Output} | grep 'x_min' | awk '{print $5}'`
-        basemap_crop_ymin=`grdinfo ${Image_Output} | grep 'y_min' | awk '{print $3}'`
-        basemap_crop_ymax=`grdinfo ${Image_Output} | grep 'y_min' | awk '{print $5}'`
-        First_Lon_Sub=`gmt math -Q ${Edge_Left} ${basemap_crop_xmin} SUB ABS 0.001 GT =`
-        Last_Lon_Sub=`gmt math -Q ${Edge_Right} ${basemap_crop_xmax} SUB ABS 0.001 GT =`
-        Lower_Lat_Sub=`gmt math -Q ${Edge_Lower} ${basemap_crop_ymin} SUB ABS 0.001 GT =`
-        Upper_Lat_Sub=`gmt math -Q ${Edge_Upper} ${basemap_crop_ymax} SUB ABS 0.001 GT =`
+    Basemap_Output=${Basemap_Output}_${Basemap_Type}.tif
+    if [ -f "${Basemap_Output}" ];then
+        basemap_crop_xmin=`grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $3}'`
+        basemap_crop_xmax=`grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $5}'`
+        basemap_crop_ymin=`grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $3}'`
+        basemap_crop_ymax=`grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $5}'`
+        First_Lon_Sub=`gmt math -Q ${Edge_Left} ${basemap_crop_xmin} SUB ABS 0.0001 GT =`
+        Last_Lon_Sub=`gmt math -Q ${Edge_Right} ${basemap_crop_xmax} SUB ABS 0.0001 GT =`
+        Lower_Lat_Sub=`gmt math -Q ${Edge_Lower} ${basemap_crop_ymin} SUB ABS 0.0001 GT =`
+        Upper_Lat_Sub=`gmt math -Q ${Edge_Upper} ${basemap_crop_ymax} SUB ABS 0.0001 GT =`
         if [ "${First_Lon_Sub}" -eq 1 ] || [ "${Last_Lon_Sub}" -eq 1 ] ||[ "${Lower_Lat_Sub}" -eq 1 ] ||[ "${Upper_Lat_Sub}" -eq 1 ];then
-            gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Image} ${Image_Output}
+            gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap} ${Basemap_Output}
         fi
     else
-        gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Image} ${Image_Output}
+        gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap} ${Basemap_Output}
+    fi
+    # 計算DEM陰影
+    if [ "${Basemap_Type}" == "DEM" ];then
+        gmt grdgradient ${Basemap_Output} -Gshade.grd -A0 -Ne0.6 -V
     fi
 }
 
 function plot_image(){
-    if [ "${Image_Type}" == "DEM" ];then
-        # 計算DEM陰影
-        #if [ "${Make_Shade}" == "true" ] || [ ! -f "shade.grd" ];then
-		#	echo ${Make_Shade}
-        #    gmt grdgradient ${Image_Output} -Gshade.grd -A0 -Ne0.6 -V
-        #    sed -i 's/Make_Shade=true/Make_Shade=false/g' ${config}
-        #fi
+    if [ "${Basemap_Type}" == "DEM" ];then
         # 將DEM底圖加上灰階
-        gmt grdgradient ${Image_Output} -Gshade.grd -A0 -Ne0.6 -V
-        gmt makecpt -C${Image_makecpt_color} -T${Image_makecpt} -Z > image_cpt.cpt
-        gmt grdimage ${Image_Output} -Cimage_cpt.cpt -Ishade.grd -J -R -K -O -P -V >> ${Output_File}
-    elif [ "${Image_Type}" == "IFG" ];then
-        gmt makecpt -C${Image_makecpt_color} -T${Image_makecpt} -Z > image_cpt.cpt
-        gmt grdimage ${Image_Output} -Cimage_cpt.cpt -J -R -K -O -P -V >> ${Output_File}
-    elif [ "${Image_Type}" == "IMG" ];then
-        gmt grdimage ${Image_Output}+b0 ${Image_Output}+b1 ${Image_Output}+b2 -J -R -E300 -K -O -P -V >> ${Output_File}
+        if [ -z "${Basemap_makecpt_color}" ];then
+            Basemap_makecpt_color=gray
+        fi
+        if [ -z "${Basemap_makecpt}" ];then
+            Basemap_makecpt=-1000/1000/1
+        fi
+        gmt makecpt -C${Basemap_makecpt_color} -T${Basemap_makecpt} -Z > image_cpt.cpt
+        gmt grdimage ${Basemap_Output} -Cimage_cpt.cpt -Ishade.grd -J -R -K -O -P -V >> ${Output_File}
+    elif [ "${Basemap_Type}" == "IFG" ];then
+        if [ -z "${Basemap_makecpt_color}" ];then
+            Basemap_makecpt_color=jet
+        fi
+        if [ -z "${Basemap_makecpt}" ];then
+            Basemap_makecpt=-3.14/3.14/0.01
+        fi
+        gmt makecpt -C${Basemap_makecpt_color} -T${Basemap_makecpt} -Z > image_cpt.cpt
+        gmt grdimage ${Basemap_Output} -Cimage_cpt.cpt -J -R -K -O -P -V >> ${Output_File}
+    elif [ "${Basemap_Type}" == "IMG" ];then
+        gmt grdimage ${Basemap_Output}+b0 ${Basemap_Output}+b1 ${Basemap_Output}+b2 -J -R -E300 -K -O -P -V >> ${Output_File}
     fi
 }
 
@@ -339,7 +348,60 @@ function plot_coastline(){
 }
 
 function plot_legend(){
-    gmt psscale -Cps.cpt -J -R -DjBC+w10c/0.5c+jTC+h+o0/1c -B${scale_B}+l"${scale_Label}" -K -O -P -V >> ${Output_File}
+    gmt psscale -C${1} -J -R -DjBC+w10c/0.5c+jTC+h+o0/1c -B${scale_B}+l"${scale_Label}" -K -O -P -V >> ${Output_File}
+}
+
+function plot_add_layer(){
+    for Addition_Layer in ${Addition_Layers}
+    do
+        LayerFile=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $1}'`
+        LayerFileName=`echo ${LayerFile} | sed 's/.*\///g' | sed 's/\..*//g'`
+        LayerIdentify=`echo ${LayerFile} | sed 's/.*\.//g'`
+        if [ "${LayerIdentify}" == "shp" ];then
+            ogr2ogr -f gmt ${LayerFileName}.gmt ${LayerFile}
+            LayerFile=${LayerFileName}.gmt
+            ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
+        elif [ "${LayerIdentify}" == "gmt" ];then
+            ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
+        elif [ "${LayerIdentify}" == "txt" ];then
+            ShapeTypeIdentify=POINT
+        else
+            echo "Not support ${LayerIdentify} format, skip layer plotting."
+        fi
+
+        Layer_Size=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $2}'`
+        Layer_Color=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $3}'`
+        Fill_Color=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $4}'`
+
+        if [ "`echo ${ShapeTypeIdentify} | grep 'POINT'`" ];then
+            if [ -z "${Layer_Size}" ];then
+                Layer_Size=${Layer_Point_Size}
+            fi
+            if [ -z "${Layer_Color}" ];then
+                Layer_Color=${Layer_Point_Color}
+            fi
+            gmt psxy ${LayerFile} -J -R -G${Layer_Color} -S${Layer_Size} -K -O -V >> ${Output_File}
+        elif [ "`echo ${ShapeTypeIdentify} | grep 'LINE'`" ];then
+            if [ -z "${Layer_Size}" ];then
+                Layer_Size=${Layer_Line_Size}
+            fi
+            if [ -z "${Layer_Color}" ];then
+                Layer_Color=${Layer_Line_Color}
+            fi
+            gmt psxy ${LayerFile} -J -R -W${Layer_Size}p,${Layer_Color} -K -O -V >> ${Output_File}
+        elif [ "`echo ${ShapeTypeIdentify} | grep 'POLYGON'`" ];then
+            if [ -z "${Layer_Size}" ];then
+                Layer_Size=${Layer_Polygon_Line_Size}
+            fi
+            if [ -z "${Layer_Color}" ];then
+                Layer_Color=${Layer_Polygon_Line_Color}
+            fi
+            if [ "${Fill_Color}" ];then
+                Fill_Color=-G${Fill_Color}
+            fi
+            gmt psxy ${LayerFile} -J -R ${Fill_Color} -W${Layer_Size}p,${Layer_Color} -K -O -V >> ${Output_File}
+        fi
+    done
 }
 
 function convert_fig(){
@@ -386,8 +448,9 @@ function plot_v(){
         config_io
         config_basemap
         config_image
-        config_psxy
+        config_psxy_PS
         config_scale
+        config_addition_layer
         config_title
         exit 1
     fi
@@ -399,7 +462,7 @@ function plot_v(){
     # 底圖設定
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
-    if [ "${Plot_Image}" == "true" ];then
+    if [ "${Plot_Basemap}" == "true" ];then
         crop_image
         plot_image
     else
@@ -407,8 +470,10 @@ function plot_v(){
     fi
     plot_ps
     plot_coastline
-    plot_legend
-
+    plot_legend ps.cpt
+    if [ "${Addition_Layers}" ];then
+        plot_add_layer
+    fi
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
@@ -426,7 +491,7 @@ function plot_d(){
         config_io
         config_basemap
         config_image
-        config_psxy
+        config_psxy_PS
         config_scale
         config_title
         exit 1
@@ -443,7 +508,7 @@ function plot_ts(){
         config_io
         config_basemap
         config_image
-        config_psxy
+        config_psxy_PS
         config_scale
         config_title
         exit 1
