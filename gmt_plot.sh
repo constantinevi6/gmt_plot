@@ -36,7 +36,7 @@ function config_gereral(){
     echo "## MAP_FRAME_TYPE 地圖邊框形式，plain=細框，fancy=斑馬紋粗框" >> ${config}
     echo "## FONT_ANNOT_PRIMARY 坐標軸字體設定" >> ${config}
     echo "gmt_config=\"" >> ${config}
-    if [ "${mode}" == "v" ];then
+    if [ "${mode}" == "velocity" ];then
         echo "FORMAT_GEO_MAP=ddd.xxF" >> ${config}
         echo "MAP_FRAME_TYPE=fancy" >> ${config}
         echo "MAP_FRAME_PEN=thicker" >> ${config}
@@ -44,14 +44,14 @@ function config_gereral(){
         echo "FONT_LOGO=Times-Roman" >> ${config}
         echo "FONT_TITLE=24p,Times-Roman" >> ${config}
         echo "FONT_ANNOT_PRIMARY=12p,Times-Roman" >> ${config}
-    elif [ "${mode}" == "d" ];then
+    elif [ "${mode}" == "deformation" ];then
         echo "FORMAT_GEO_MAP=ddd.xxF" >> ${config}
         echo "MAP_FRAME_TYPE=plain" >> ${config}
         echo "MAP_FRAME_PEN=thicker" >> ${config}
         echo "FONT=Times-Roman" >> ${config}
         echo "FONT_LOGO=Times-Roman" >> ${config}
         echo "FONT_ANNOT_PRIMARY=6p,Times-Roman" >> ${config}
-    elif [ "${mode}" == "ts" ];then
+    elif [ "${mode}" == "timeseries" ];then
         echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
         echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
         echo "FORMAT_DATE_MAP=o" >> ${config}
@@ -64,7 +64,7 @@ function config_gereral(){
         echo "FONT_LABEL=18p,Times-Roman" >> ${config}
         echo "MAP_ANNOT_OFFSET_PRIMARY=16p" >> ${config}
         echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
-    elif [ "${mode}" == "bl" ];then
+    elif [ "${mode}" == "baseline" ];then
         echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
         echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
         echo "FORMAT_DATE_MAP=o" >> ${config}
@@ -155,11 +155,12 @@ function config_psxy_PS(){
 function config_psxy_baseline(){
     echo "# psxy setting" >> ${config}
     echo "## 設定資料點樣式與大小，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
-    echo "psxy_Size=0.02" >> ${config}
+    echo "psxy_Size=0.2" >> ${config}
     echo "psxy_Type=c" >> ${config}
     echo "psxy_G=black" >> ${config}
     echo "## 設定主影像資料點樣式與大小" >> ${config}
-    echo "M_psxy_Size=c0.4" >> ${config}
+    echo "M_psxy_Size=0.4" >> ${config}
+    echo "M_psxy_Type=c" >> ${config}
     echo "M_psxy_G=red" >> ${config}
     echo "## 設定連線樣式" >> ${config}
     echo "psxy_W=2p,gray" >> ${config}
@@ -195,8 +196,13 @@ function config_addition_layer(){
 }
 
 function config_title(){
+    argvs=$@
+    for argv in ${argvs}
+    do
+        Title="${Title} ${argv}"
+    done
     echo "# title setting" >> ${config}
-    echo "Title=\"\"" >> ${config}
+    echo "Title=\"${Title}\"" >> ${config}
 }
 
 function config_default_v(){
@@ -250,14 +256,16 @@ function setting_argument(){
     fi
     psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
     psbasemap_By=a${Map_Bay}b${Map_Bby}
-    if [ "${Map_Offset_X}" != "" ];then
-        X=-X${Map_Offset_X}
-    fi
-    if [ "${Map_Offset_Y}" != "" ];then
-        Y=-Y${Map_Offset_Y}
-    fi
-    psxy_S=${psxy_Type}${psxy_Size}
+    psxy_Size=${psxy_Type}${psxy_Size}
+    M_psxy_Size=${M_psxy_Type}${M_psxy_Size}
     scale_B=a${scale_Ba}f${scale_Bf}
+}
+
+function setting_XYOffset(){
+    if [ $# -ne 0 ];then
+    X=-X${1}
+    Y=-Y${2}
+    fi
 }
 
 function define_edge(){
@@ -271,8 +279,11 @@ function define_edge_time(){
     gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
     Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
     Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
-    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
-    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
+    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f1`
+    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f2`
+    Edge_Y=`gmt math -Q ${Edge_Lower} ${Edge_Upper} MAX =`
+    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I20 -C | cut -f1`
+    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I20 -C | cut -f2`
 }
 
 function define_edge_geo(){
@@ -340,7 +351,7 @@ function plot_image(){
 
 function plot_ps(){
     gmt makecpt -C${psxy_makecpt_color} -T${psxy_makecpt} -Z > ps.cpt
-    gmt psxy ${Input_Data} -J -R -S${psxy_S} -Cps.cpt -K -O -V >> ${Output_File}
+    gmt psxy ${Input_Data} -J -R -S${psxy_Size} -Cps.cpt -K -O -V >> ${Output_File}
 }
 
 function plot_coastline(){
@@ -436,7 +447,7 @@ function convert_fig(){
     psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
 }
 
-function plot_v(){
+function plot_velocity(){
     # 產生Configure
     if [ ! -f "${config}" ];then
         define_edge_geo
@@ -451,13 +462,14 @@ function plot_v(){
         config_psxy_PS
         config_scale
         config_addition_layer
-        config_title
+        config_title PS Velocity Plot
         exit 1
     fi
 
     # 載入參數
     setting_config
     setting_argument
+    setting_XYOffset 3 4
     setting_output
     # 底圖設定
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
@@ -479,7 +491,7 @@ function plot_v(){
     convert_fig
 }
 
-function plot_d(){
+function plot_deformation(){
 
     if [ ! -f "${config}" ];then
         define_edge_geo
@@ -493,14 +505,14 @@ function plot_d(){
         config_image
         config_psxy_PS
         config_scale
-        config_title
+        config_title PS Deformation Plot
         exit 1
     fi
     source ${pwd}/${config}
     Output_File=${Output_File}.ps
 }
 
-function plot_ts(){
+function plot_timeseries(){
     if [ ! -f "${config}" ];then
         config_default_ts
         help_config
@@ -510,14 +522,14 @@ function plot_ts(){
         config_image
         config_psxy_PS
         config_scale
-        config_title
+        config_title PS Time Series Plot
         exit 1
     fi
     source ${pwd}/${config}
     Output_File=${Output_File}.ps
 }
 
-function plot_bl(){
+function plot_baseline(){
     Input_X=${Input_Date}
     Input_Y=${Input_Bperp}
     if [ ! -f "${config}" ];then
@@ -530,18 +542,22 @@ function plot_bl(){
         config_io
         config_basemap
         config_psxy_baseline
+        config_title Baseline Plot
         exit 1
     fi
     setting_config
     setting_argument
+    setting_XYOffset 3 3
     setting_output
     Imgs_Count=`wc -l ${Input_Date} | awk '{print $1}'`
     BperpArray=(`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}'`)
     DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
     
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
-    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx1Y -Bpxa3Of1o -Bpy200 ${X} ${Y} -K -V > ${Output_File}
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"Bperp (m)" ${X} ${Y} -K -V > ${Output_File}
+    echo "gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l""Time"" -By${psbasemap_By}+l""Bperp (m)"" ${X} ${Y} -K -V > ${Output_File}"
     cp ${Output_File} temp.ps
+    rm ${Output_File}
 
     echo "DInSAR"
     setting_output dinsar
@@ -616,12 +632,12 @@ fi
 Input_config=${2}
 define_io
 define_configure
-if [ "${mode}" == "v" ];then
-    plot_v
-elif [ "${mode}" == "d" ];then
-    plot_d
-elif [ "${mode}" == "ts" ];then
-    plot_ts
-elif [ "${mode}" == "bl" ];then
-    plot_bl
+if [ "${mode}" == "velocity" ];then
+    plot_velocity
+elif [ "${mode}" == "deformation" ];then
+    plot_deformation
+elif [ "${mode}" == "timeseries" ];then
+    plot_timeseries
+elif [ "${mode}" == "baseline" ];then
+    plot_baseline
 fi
