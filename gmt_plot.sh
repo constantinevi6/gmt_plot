@@ -37,6 +37,14 @@ function define_configure(){
     fi
 }
 
+function define_ts_list(){
+    if [ -z "${TS_list}" ];then
+        unset TS_list
+    else
+        TS_list=${TS_list}
+    fi
+}
+
 function config_gereral(){
     echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
     echo "# General setting" >> ${config}
@@ -233,6 +241,8 @@ function config_addition_layer(){
     echo "## 設定多邊形邊線寬與顏色" >> ${config}
     echo "Layer_Polygon_Line_Size=" >> ${config}
     echo "Layer_Polygon_Line_Color=" >> ${config}
+    echo "## 圖層位置，在PS之前=front，在PS之後=back" >> ${config}
+    echo "Addition_Layers_Position=front" >> ${config}
     echo "" >> ${config}
 }
 
@@ -543,10 +553,16 @@ function plot_velocity(){
     else
         echo Skipping plot image.
     fi
-    if [ "${Addition_Layers}" ];then
+    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "front" ];then
         plot_add_layer
     fi
+
     plot_ps
+
+    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "back" ];then
+        plot_add_layer
+    fi
+
     plot_coastline
     plot_legend ps.cpt
 
@@ -831,6 +847,9 @@ else
     mode=${1}
 fi
 Input_config=${2}
+
+TS_list=${3}
+
 define_io
 define_configure
 if [ "${mode}" == "velocity" ];then
