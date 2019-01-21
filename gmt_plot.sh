@@ -21,6 +21,14 @@ function define_io(){
     Input_LonLat=ps_ll.txt
 }
 
+function define_io_gps(){
+    Input_Data=*.COR
+    Input_Date=
+    Input_Bperp=
+    Input_SBAS=
+    Input_LonLat=
+}
+
 function define_configure(){
     if [ -z "${Input_config}" ];then
         config=gmt_plot_${mode}.config
@@ -40,6 +48,7 @@ function config_gereral(){
         echo "FORMAT_GEO_MAP=ddd.xxF" >> ${config}
         echo "MAP_FRAME_TYPE=fancy" >> ${config}
         echo "MAP_FRAME_PEN=thicker" >> ${config}
+        echo "MAP_ANNOT_OFFSET=5p" >> ${config}
         echo "FONT=Times-Roman" >> ${config}
         echo "FONT_LOGO=Times-Roman" >> ${config}
         echo "FONT_TITLE=24p,Times-Roman" >> ${config}
@@ -75,6 +84,19 @@ function config_gereral(){
         echo "FONT_ANNOT_PRIMARY=20p,Times-Roman" >> ${config}
         echo "FONT_ANNOT_SECONDARY=18p,Times-Roman" >> ${config}
         echo "FONT_LABEL=18p,Times-Roman" >> ${config}
+    elif [ "${mode}" == "gps" ];then
+        echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
+        echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
+        echo "FORMAT_DATE_MAP=o" >> ${config}
+        echo "FORMAT_TIME_PRIMARY_MAP=abbreviated" >> ${config}
+        echo "FONT=Times-Roman" >> ${config}
+        echo "FONT_LOGO=Times-Roman" >> ${config}
+        echo "FONT_TITLE=24p,Times-Roman" >> ${config}
+        echo "FONT_ANNOT_PRIMARY=20p,Times-Roman" >> ${config}
+        echo "FONT_ANNOT_SECONDARY=18p,Times-Roman" >> ${config}
+        echo "FONT_LABEL=18p,Times-Roman" >> ${config}
+        echo "MAP_ANNOT_OFFSET_PRIMARY=16p" >> ${config}
+        echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
     fi
     echo "\"" >> ${config}
     echo "" >> ${config}
@@ -167,6 +189,25 @@ function config_psxy_baseline(){
     echo "" >> ${config}
 }
 
+function config_psxy_timeseries(){
+    echo "# psxy setting" >> ${config}
+    echo "## 設定資料點樣式與大小，格式=[樣式代號][大小]，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
+    echo "## 是否繪製各PS點變形量" >> ${config}
+    echo "Plot_single_PS=false" >> ${config}
+    echo "psxy_Size=c0.1" >> ${config}
+    echo "## 是否繪製平均變形量" >> ${config}
+    echo "Plot_Mean_PS=ture" >> ${config}
+    echo "psxy_Size_Mean=c0.2" >> ${config}
+    echo "psxy_G=black" >> ${config}
+    echo "## 設定連線樣式" >> ${config}
+    echo "psxy_W=1p" >> ${config}
+
+    echo "## 設定PS中心座標與範圍，範圍單位:度" >> ${config}
+    echo "PS_Center_Lon=" >> ${config}
+    echo "PS_Center_Lat=" >> ${config}
+    echo "PS_Radius=0.001" >> ${config}
+}
+
 function config_scale(){
     echo "# scale setting" >> ${config}
     echo "## 圖例文字說明" >> ${config}
@@ -202,7 +243,7 @@ function config_title(){
         Title="${Title} ${argv}"
     done
     echo "# title setting" >> ${config}
-    echo "Title=\"${Title}\"" >> ${config}
+    echo "Title=\"${Title}\" " >> ${config}
 }
 
 function config_default_v(){
@@ -220,6 +261,16 @@ function config_default_ts(){
     Map_Projection=X
     Map_Width=9
     Map_High=6
+    Map_Bax=1
+    Map_Bbx=3
+    Map_Bay=50
+    Map_Bby=10
+}
+
+function config_default_gps(){
+    Map_Projection=X
+    Map_Width=9
+    Map_High=4
     Map_Bax=1
     Map_Bbx=3
     Map_Bay=50
@@ -254,11 +305,22 @@ function setting_argument(){
     if [ ! -z "${Map_High}" ];then
         psbasemap_J=${psbasemap_J}/${Map_High}${Map_Width_unit}
     fi
-    psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
-    psbasemap_By=a${Map_Bay}b${Map_Bby}
+    if [ "${Map_Projection}" == "X" ];then
+        psbasemap_Bx=a${Map_Bax}f${Map_Bbx}
+        psbasemap_By=a${Map_Bay}f${Map_Bby}
+    else
+        psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
+        psbasemap_By=a${Map_Bay}b${Map_Bby}
+    fi
     psxy_Size=${psxy_Type}${psxy_Size}
     M_psxy_Size=${M_psxy_Type}${M_psxy_Size}
     scale_B=a${scale_Ba}f${scale_Bf}
+    if [ "${psxy_W}" == "-" ];then
+        psxy_W=-W${psxy_W}
+    elif [ ! -z "${psxy_W}" ];then
+        errorbar=-Ey/${psxy_W}
+        psxy_W=-W${psxy_W}
+    fi
 }
 
 function setting_XYOffset(){
@@ -282,8 +344,8 @@ function define_edge_time(){
     Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f1`
     Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f2`
     Edge_Y=`gmt math -Q ${Edge_Lower} ${Edge_Upper} MAX =`
-    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I20 -C | cut -f1`
-    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I20 -C | cut -f2`
+    Edge_Lower=-${Edge_Y}
+    Edge_Upper=${Edge_Y}
 }
 
 function define_edge_geo(){
@@ -324,7 +386,7 @@ function crop_image(){
     fi
 }
 
-function plot_image(){
+function plot_basemap(){
     if [ "${Basemap_Type}" == "DEM" ];then
         # 將DEM底圖加上灰階
         if [ -z "${Basemap_makecpt_color}" ];then
@@ -368,6 +430,7 @@ function plot_add_layer(){
         LayerFile=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $1}'`
         LayerFileName=`echo ${LayerFile} | sed 's/.*\///g' | sed 's/\..*//g'`
         LayerIdentify=`echo ${LayerFile} | sed 's/.*\.//g'`
+        echo Processing ${LayerFileName}
         if [ "${LayerIdentify}" == "shp" ];then
             ogr2ogr -f gmt ${LayerFileName}.gmt ${LayerFile}
             LayerFile=${LayerFileName}.gmt
@@ -383,7 +446,7 @@ function plot_add_layer(){
         Layer_Size=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $2}'`
         Layer_Color=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $3}'`
         Fill_Color=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $4}'`
-
+        
         if [ "`echo ${ShapeTypeIdentify} | grep 'POINT'`" ];then
             if [ -z "${Layer_Size}" ];then
                 Layer_Size=${Layer_Point_Size}
@@ -476,16 +539,17 @@ function plot_velocity(){
 
     if [ "${Plot_Basemap}" == "true" ];then
         crop_image
-        plot_image
+        plot_basemap
     else
         echo Skipping plot image.
+    fi
+    if [ "${Addition_Layers}" ];then
+        plot_add_layer
     fi
     plot_ps
     plot_coastline
     plot_legend ps.cpt
-    if [ "${Addition_Layers}" ];then
-        plot_add_layer
-    fi
+
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
@@ -494,8 +558,6 @@ function plot_velocity(){
 function plot_deformation(){
 
     if [ ! -f "${config}" ];then
-        define_edge_geo
-        define_edge_cpt
         config_default_v
 
         help_config
@@ -514,7 +576,110 @@ function plot_deformation(){
 
 function plot_timeseries(){
     if [ ! -f "${config}" ];then
+        Input_X=${Input_Date}
+        Input_Y=${Input_Bperp}
+        define_edge_time
         config_default_ts
+        help_config
+        config_gereral
+        config_io
+        config_basemap
+        config_psxy_timeseries
+        config_title PS Time Series Plot
+        exit 1
+    fi
+
+    setting_config
+    setting_argument
+    setting_XYOffset 3 4
+    setting_output ${PS_Center_Lon} ${PS_Center_Lat}
+
+    F_Lon=`echo "${PS_Center_Lon}-${PS_Radius}" | bc`
+    L_Lon=`echo "${PS_Center_Lon}+${PS_Radius}" | bc`
+    U_Lat=`echo "${PS_Center_Lat}+${PS_Radius}" | bc`
+    L_Lat=`echo "${PS_Center_Lat}-${PS_Radius}" | bc`
+    echo Load data.
+    #載入資料
+    Input_FilesArray=(`ls -v ${Input_Data}`)
+    nl  ${Input_LonLat} | awk '$2>'"${F_Lon}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$2<'"${L_Lon}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$3<'"${U_Lat}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$3>'"${L_Lat}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' > tmp_Candidates.txt
+    PS_Count=`wc -l tmp_Candidates.txt | awk '{print $1}'`
+    if [ "${PS_Count}" -eq 0 ];then
+        echo "No PS found in select area."
+        exit 1
+    fi
+    Date_Count=`wc -l ${Input_Date} | awk '{print $1}'`
+    LineArray=(`cat tmp_Candidates.txt | awk '{printf("%d\n",$1)}'`)
+    LonArray=(`cat tmp_Candidates.txt | awk '{printf("%.8f\n",$2)}'`)
+    LatArray=(`cat tmp_Candidates.txt | awk '{printf("%.8f\n",$3)}'`)
+    DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
+    
+    gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"Displacement (mm)" ${X} ${Y} -K -V > ${Output_File}
+    echo Crop data.
+    for (( i=0; i<${Date_Count}; i=i+1 ))
+    do
+        echo ${Input_FilesArray[${i}]}
+        awk -v FL="${LineArray[0]}" -v LL="${LineArray[$((PS_Count-1))]}" 'NR >= FL && NR <= LL' ${Input_FilesArray[${i}]} > tmp_${i}.txt
+    done
+
+    echo "Calculate PS inside selected range...."
+    PS_Select=0
+    for (( i=0; i<${PS_Count}; i=i+1 ))
+    do
+        Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
+        Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
+        echo Checking $Lon $Lat
+        Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
+        Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
+        r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+        R2=`gmt math -Q ${PS_Radius} SQR =`
+        Identify=`gmt math -Q ${R2} ${r2} GE =`
+        if [ "${Identify}" -eq "1" ];then
+            echo "> -Z"${i} >> tmp_TS.txt
+            echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
+            for (( j=0; j<${Date_Count}; j=j+1 ))
+            do
+                data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+                line=${line}\ ${data}
+                echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
+            done
+            echo ${line} >> tmp_TS_Data.txt
+            PS_Select=$((PS_Select+1))
+            unset line
+            if [ "$Plot_single_PS" == "true" ];then
+                gmt psxy -R -J -S${psxy_Size} -Ccategorical.cpt -O -K tmp_TS.txt >> ${Output_File}
+            fi
+        else
+            continue
+        fi
+    done
+    echo -e "\e[1;31mTotal ${PS_Select} PS selected.\e[0m"
+    # 繪製平均曲線與誤差
+    MeanArray=(`gmt math -Ca -S tmp_TS_Data.txt MEAN =`)
+    StdArray=(`gmt math -Ca -S tmp_TS_Data.txt STD =`)
+    echo "> -Z0" >> tmp_TS_Mean_Error.txt
+    echo "Drawing error bar...."
+    for (( j=0; j<${Date_Count}; j=j+1 ))
+    do
+        echo ${DateArray[${j}]} ${MeanArray[${j}]} ${StdArray[${j}]} >> tmp_TS_Mean_Error.txt
+    done
+    gmt psxy -R -J ${psxy_W} -O -K tmp_TS_Mean_Error.txt >> ${Output_File}
+    gmt psxy -R -J -S${psxy_Size_Mean} -G${psxy_G} ${errorbar} -O -K tmp_TS_Mean_Error.txt >> ${Output_File}
+    echo "75 98 Central Lon : ${PS_Center_Lon}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${Output_File}
+    echo "75 92 Central Lat : ${PS_Center_Lat}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
+    echo "75 86 Selected PSs : ${PS_Select}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
+    
+    # 封檔
+    gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
+
+    #刪除暫存檔
+    rm tmp_*
+}
+
+function plot_gps(){
+    if [ ! -f "${config}" ];then
+        config_default_gps
         help_config
         config_gereral
         config_io
@@ -525,8 +690,45 @@ function plot_timeseries(){
         config_title PS Time Series Plot
         exit 1
     fi
-    source ${pwd}/${config}
+    
     Output_File=${Output_File}.ps
+    setting_config
+}
+
+function plot_image(){
+    if [ ! -f "${config}" ];then
+        define_edge_geo
+        config_default_v
+
+        help_config
+        config_gereral
+        config_io
+        config_basemap
+        config_image
+        config_addition_layer
+        config_title
+        exit 1
+    fi
+
+    setting_config
+    setting_argument
+    setting_XYOffset 3 4
+    setting_output
+
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
+
+    crop_image
+    plot_basemap
+    
+    if [ "${Addition_Layers}" ];then
+        plot_add_layer
+    fi
+
+    plot_coastline
+
+    # 封檔
+    gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
 }
 
 function plot_baseline(){
@@ -555,7 +757,6 @@ function plot_baseline(){
     
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"Bperp (m)" ${X} ${Y} -K -V > ${Output_File}
-    echo "gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l""Time"" -By${psbasemap_By}+l""Bperp (m)"" ${X} ${Y} -K -V > ${Output_File}"
     cp ${Output_File} temp.ps
     rm ${Output_File}
 
@@ -573,7 +774,7 @@ function plot_baseline(){
     for (( i=0; i<${Ifgs_Count}; i=i+1 ))
     do
         echo "${DateArray[${i}]} ${BperpArray[${i}]}"
-        echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -Fr${Master}/0 -W${psxy_W} -O -K >> ${Output_File}
+        echo ${DateArray[${i}]} ${BperpArray[${i}]} | gmt psxy -R -J -Fr${Master}/0 ${psxy_W} -O -K >> ${Output_File}
     done
     for (( i=0; i<${Imgs_Count}; i=i+1 ))
     do
@@ -609,7 +810,7 @@ function plot_baseline(){
                 fi
             done
             echo "${MasterDate} ${SlaveDate}"
-            echo ${SlaveDate} ${SlaveBperp} | gmt psxy -R -J -Fr${MasterDate}/${MasterBperp} -W${psxy_W} -O -K >> ${Output_File}
+            echo ${SlaveDate} ${SlaveBperp} | gmt psxy -R -J -Fr${MasterDate}/${MasterBperp} ${psxy_W} -O -K >> ${Output_File}
         done
         for (( i=0; i<${Imgs_Count}; i=i+1 ))
         do
@@ -640,4 +841,10 @@ elif [ "${mode}" == "timeseries" ];then
     plot_timeseries
 elif [ "${mode}" == "baseline" ];then
     plot_baseline
+elif [ "${mode}" == "gps" ];then
+    plot_gps
+elif [ "${mode}" == "image" ];then
+    plot_image
+else
+    help
 fi
