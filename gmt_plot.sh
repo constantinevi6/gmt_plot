@@ -38,10 +38,10 @@ function define_configure(){
 }
 
 function define_ts_list(){
-    if [ -z "${TS_list}" ];then
-        unset TS_list
-    else
+    if [ -e "${TS_list}" ];then
         TS_list=${TS_list}
+    else
+        unset TS_list
     fi
 }
 
@@ -608,6 +608,10 @@ function plot_timeseries(){
     setting_config
     setting_argument
     setting_XYOffset 3 4
+    if [ "${1}" ] && [ "${2}" ];then
+        PS_Center_Lon=${1}
+        PS_Center_Lat=${2}
+    fi
     setting_output ${PS_Center_Lon} ${PS_Center_Lat}
 
     F_Lon=`echo "${PS_Center_Lon}-${PS_Radius}" | bc`
@@ -852,12 +856,26 @@ TS_list=${3}
 
 define_io
 define_configure
+define_ts_list
+
 if [ "${mode}" == "velocity" ];then
     plot_velocity
 elif [ "${mode}" == "deformation" ];then
     plot_deformation
 elif [ "${mode}" == "timeseries" ];then
-    plot_timeseries
+    if [ "${3}" ];then
+        LL_list=`cat ${TS_list}`
+        for LL in ${LL_list}
+        do
+            lon=`echo ${LL} | awk 'BEGIN {FS = ","} {print $1}'`
+            lat=`echo ${LL} | awk 'BEGIN {FS = ","} {print $2}'`
+            echo "Batch processing...."
+            echo "Plotting PS ${lon} ${lat}"
+            plot_timeseries ${lon} ${lat}
+        done
+    else
+        plot_timeseries
+    fi
 elif [ "${mode}" == "baseline" ];then
     plot_baseline
 elif [ "${mode}" == "gps" ];then
