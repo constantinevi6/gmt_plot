@@ -210,10 +210,10 @@ function config_psxy_timeseries(){
     echo "## 設定連線樣式" >> ${config}
     echo "psxy_W=1p" >> ${config}
 
-    echo "## 設定PS中心座標與範圍，範圍單位:度" >> ${config}
+    echo "## 設定PS中心座標與範圍，範圍單位:m" >> ${config}
     echo "PS_Center_Lon=" >> ${config}
     echo "PS_Center_Lat=" >> ${config}
-    echo "PS_Radius=0.001" >> ${config}
+    echo "PS_Radius=10" >> ${config}
 }
 
 function config_scale(){
@@ -517,7 +517,7 @@ function convert_fig(){
     if [ "${Output_Figure_Adjust}" == "true" ];then
         psconvert_A=-A
     fi
-    psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
+    gmt psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
 }
 
 function plot_velocity(){
@@ -614,10 +614,10 @@ function plot_timeseries(){
     fi
     setting_output ${PS_Center_Lon} ${PS_Center_Lat}
 
-    F_Lon=`echo "${PS_Center_Lon}-${PS_Radius}" | bc`
-    L_Lon=`echo "${PS_Center_Lon}+${PS_Radius}" | bc`
-    U_Lat=`echo "${PS_Center_Lat}+${PS_Radius}" | bc`
-    L_Lat=`echo "${PS_Center_Lat}-${PS_Radius}" | bc`
+    F_Lon=`echo "${PS_Center_Lon}-0.001" | bc`
+    L_Lon=`echo "${PS_Center_Lon}+0.001" | bc`
+    U_Lat=`echo "${PS_Center_Lat}+0.001" | bc`
+    L_Lat=`echo "${PS_Center_Lat}-0.001" | bc`
     echo Load data.
     #載入資料
     Input_FilesArray=(`ls -v ${Input_Data}`)
@@ -649,9 +649,10 @@ function plot_timeseries(){
         Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
         Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
         echo Checking $Lon $Lat
-        Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
-        Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
-        r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+        # Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
+        # Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
+        # r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+        r2=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         R2=`gmt math -Q ${PS_Radius} SQR =`
         Identify=`gmt math -Q ${R2} ${r2} GE =`
         if [ "${Identify}" -eq "1" ];then
@@ -842,6 +843,8 @@ function plot_baseline(){
     rm temp.ps
 }
 
+start=$(date +%s.%N)
+
 # 讀取設定檔
 pwd=`pwd`
 if [ -z "${1}" ];then
@@ -885,3 +888,7 @@ elif [ "${mode}" == "image" ];then
 else
     help
 fi
+
+end=$(date +%s.%N)
+runtime=$(echo "${end} - ${start}" | bc)
+echo "Runtime was $runtime"
