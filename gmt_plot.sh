@@ -129,8 +129,8 @@ function config_io(){
     echo "" >> ${config}
 }
 
-function config_basemap(){
-    echo "# Basemap setting" >> ${config}
+function config_psbasemap(){
+    echo "# GMT psbasemap setting" >> ${config}
     echo "## 設定底圖範圍，注意！底圖範圍不可以超出底圖檔案範圍" >> ${config}
     echo "Edge_Left=${Edge_Left}" >> ${config}
     echo "Edge_Right=${Edge_Right}" >> ${config}
@@ -154,12 +154,12 @@ function config_basemap(){
     echo "" >> ${config}
 }
 
-function config_image(){
+function config_basemap_image(){
     echo "# Basemap setting" >> ${config}
     echo "## 是否繪製底圖" >> ${config}
     echo "Plot_Basemap=false" >> ${config}
     echo "## 輸入底圖的絕對路徑" >> ${config}
-    echo "Basemap=" >> ${config}
+    echo "Basemap_Path=" >> ${config}
     echo "## 底圖類型，DEM=數值地形模型，IFG=差分干涉圖，IMG=多光譜影像" >> ${config}
     echo "Basemap_Type=DEM" >> ${config}
     echo "## 輸出底圖名稱" >> ${config}
@@ -210,10 +210,10 @@ function config_psxy_timeseries(){
     echo "## 設定連線樣式" >> ${config}
     echo "psxy_W=1p" >> ${config}
 
-    echo "## 設定PS中心座標與範圍，範圍單位:度" >> ${config}
+    echo "## 設定PS中心座標與範圍，範圍單位:m" >> ${config}
     echo "PS_Center_Lon=" >> ${config}
     echo "PS_Center_Lat=" >> ${config}
-    echo "PS_Radius=0.001" >> ${config}
+    echo "PS_Radius=10" >> ${config}
 }
 
 function config_scale(){
@@ -385,10 +385,10 @@ function crop_image(){
         Lower_Lat_Sub=`gmt math -Q ${Edge_Lower} ${basemap_crop_ymin} SUB ABS 0.0001 GT =`
         Upper_Lat_Sub=`gmt math -Q ${Edge_Upper} ${basemap_crop_ymax} SUB ABS 0.0001 GT =`
         if [ "${First_Lon_Sub}" -eq 1 ] || [ "${Last_Lon_Sub}" -eq 1 ] ||[ "${Lower_Lat_Sub}" -eq 1 ] ||[ "${Upper_Lat_Sub}" -eq 1 ];then
-            gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap} ${Basemap_Output}
+            gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap_Path} ${Basemap_Output}
         fi
     else
-        gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap} ${Basemap_Output}
+        gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap_Path} ${Basemap_Output}
     fi
     # 計算DEM陰影
     if [ "${Basemap_Type}" == "DEM" ];then
@@ -396,7 +396,7 @@ function crop_image(){
     fi
 }
 
-function plot_basemap(){
+function plot_basemap_image(){
     if [ "${Basemap_Type}" == "DEM" ];then
         # 將DEM底圖加上灰階
         if [ -z "${Basemap_makecpt_color}" ];then
@@ -517,7 +517,7 @@ function convert_fig(){
     if [ "${Output_Figure_Adjust}" == "true" ];then
         psconvert_A=-A
     fi
-    psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
+    gmt psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
 }
 
 function plot_velocity(){
@@ -530,8 +530,8 @@ function plot_velocity(){
         help_config
         config_gereral
         config_io
-        config_basemap
-        config_image
+        config_psbasemap
+        config_basemap_image
         config_psxy_PS
         config_scale
         config_addition_layer
@@ -549,7 +549,7 @@ function plot_velocity(){
 
     if [ "${Plot_Basemap}" == "true" ];then
         crop_image
-        plot_basemap
+        plot_basemap_image
     else
         echo Skipping plot image.
     fi
@@ -579,8 +579,8 @@ function plot_deformation(){
         help_config
         config_gereral
         config_io
-        config_basemap
-        config_image
+        config_psbasemap
+        config_basemap_image
         config_psxy_PS
         config_scale
         config_title PS Deformation Plot
@@ -599,7 +599,7 @@ function plot_timeseries(){
         help_config
         config_gereral
         config_io
-        config_basemap
+        config_psbasemap
         config_psxy_timeseries
         config_title PS Time Series Plot
         exit 1
@@ -608,20 +608,64 @@ function plot_timeseries(){
     setting_config
     setting_argument
     setting_XYOffset 3 4
-    if [ "${1}" ] && [ "${2}" ];then
-        PS_Center_Lon=${1}
-        PS_Center_Lat=${2}
-    fi
-    setting_output ${PS_Center_Lon} ${PS_Center_Lat}
 
-    F_Lon=`echo "${PS_Center_Lon}-${PS_Radius}" | bc`
-    L_Lon=`echo "${PS_Center_Lon}+${PS_Radius}" | bc`
-    U_Lat=`echo "${PS_Center_Lat}+${PS_Radius}" | bc`
-    L_Lat=`echo "${PS_Center_Lat}-${PS_Radius}" | bc`
+    if [ -f "${1}" ];then
+        LonLat_list=`cat ${1}`
+        for LonLat in ${LonLat_list}
+        do
+            PS_Center_Lon=`echo ${LonLat} | awk 'BEGIN {FS = ","} {print $1}'`
+            PS_Center_Lat=`echo ${LonLat} | awk 'BEGIN {FS = ","} {print $2}'`
+            echo "Batch processing...."
+            echo "Plotting PS ${PS_Center_Lon} ${PS_Center_Lat}"
+        done
+    else
+    fi
+
+    setting_output ${PS_Center_Lon} ${PS_Center_Lat}
+    Crop_Identify=0
+    until [ "${Crop_Identify}" -eq "1" ]
+    do
+        F_Lon=`echo "${PS_Center_Lon}-0.00001" | bc`
+        Distance=`m2ll ${F_Lon} ${PS_Center_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+        Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
+    done
+    Crop_Identify=0
+    until [ "${Crop_Identify}" -eq "1" ]
+    do
+        L_Lon=`echo "${PS_Center_Lon}+0.00001" | bc`
+        Distance=`m2ll ${L_Lon} ${PS_Center_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+        Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
+    done
+    Crop_Identify=0
+    until [ "${Crop_Identify}" -eq "1" ]
+    do
+        U_Lat=`echo "${PS_Center_Lat}+0.00001" | bc`
+        Distance=`m2ll ${PS_Center_Lon} ${U_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+        Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
+    done
+    Crop_Identify=0
+    until [ "${Crop_Identify}" -eq "1" ]
+    do
+        L_Lat=`echo "${PS_Center_Lat}-0.00001" | bc`
+        Distance=`m2ll ${PS_Center_Lon} ${L_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+        Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
+    done
+    end=$(date +%s.%N)
+    runtime=$(echo "${end} - ${start}" | bc)
+    echo "Runtime 1 was ${runtime}"
+    # F_Lon=`echo "${PS_Center_Lon}-0.001" | bc`
+    # L_Lon=`echo "${PS_Center_Lon}+0.001" | bc`
+    # U_Lat=`echo "${PS_Center_Lat}+0.001" | bc`
+    # L_Lat=`echo "${PS_Center_Lat}-0.001" | bc`
     echo Load data.
     #載入資料
     Input_FilesArray=(`ls -v ${Input_Data}`)
-    nl  ${Input_LonLat} | awk '$2>'"${F_Lon}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$2<'"${L_Lon}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$3<'"${U_Lat}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' | awk '$3>'"${L_Lat}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' > tmp_Candidates.txt
+    nl  ${Input_LonLat} | awk '$2>'"${F_Lon}"' && $2<'"${L_Lon}"' && $3<'"${U_Lat}"' && $3>'"${L_Lat}"' {printf("%d %.8f %.8f\n",$1,$2,$3)}' > tmp_Candidates.txt
+    
+    end=$(date +%s.%N)
+    runtime=$(echo "${end} - ${start}" | bc)
+    echo "Runtime 2 was ${runtime}"
+
     PS_Count=`wc -l tmp_Candidates.txt | awk '{print $1}'`
     if [ "${PS_Count}" -eq 0 ];then
         echo "No PS found in select area."
@@ -649,11 +693,12 @@ function plot_timeseries(){
         Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
         Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
         echo Checking $Lon $Lat
-        Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
-        Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
-        r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
-        R2=`gmt math -Q ${PS_Radius} SQR =`
-        Identify=`gmt math -Q ${R2} ${r2} GE =`
+        # Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
+        # Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
+        # r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+        r2=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+        # R2=`gmt math -Q ${PS_Radius} SQR =`
+        Identify=`gmt math -Q ${PS_Radius} ${r2} GE =`
         if [ "${Identify}" -eq "1" ];then
             echo "> -Z"${i} >> tmp_TS.txt
             echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
@@ -703,8 +748,8 @@ function plot_gps(){
         help_config
         config_gereral
         config_io
-        config_basemap
-        config_image
+        config_psbasemap
+        config_basemap_image
         config_psxy_PS
         config_scale
         config_title PS Time Series Plot
@@ -723,8 +768,8 @@ function plot_image(){
         help_config
         config_gereral
         config_io
-        config_basemap
-        config_image
+        config_psbasemap
+        config_basemap_image
         config_addition_layer
         config_title
         exit 1
@@ -738,7 +783,7 @@ function plot_image(){
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
     crop_image
-    plot_basemap
+    plot_basemap_image
     
     if [ "${Addition_Layers}" ];then
         plot_add_layer
@@ -762,7 +807,7 @@ function plot_baseline(){
         config_default_ts
         config_gereral
         config_io
-        config_basemap
+        config_psbasemap
         config_psxy_baseline
         config_title Baseline Plot
         exit 1
@@ -842,6 +887,8 @@ function plot_baseline(){
     rm temp.ps
 }
 
+start=$(date +%s.%N)
+
 # 讀取設定檔
 pwd=`pwd`
 if [ -z "${1}" ];then
@@ -852,30 +899,15 @@ else
 fi
 Input_config=${2}
 
-TS_list=${3}
-
 define_io
 define_configure
-define_ts_list
 
 if [ "${mode}" == "velocity" ];then
     plot_velocity
 elif [ "${mode}" == "deformation" ];then
     plot_deformation
 elif [ "${mode}" == "timeseries" ];then
-    if [ "${3}" ];then
-        LL_list=`cat ${TS_list}`
-        for LL in ${LL_list}
-        do
-            lon=`echo ${LL} | awk 'BEGIN {FS = ","} {print $1}'`
-            lat=`echo ${LL} | awk 'BEGIN {FS = ","} {print $2}'`
-            echo "Batch processing...."
-            echo "Plotting PS ${lon} ${lat}"
-            plot_timeseries ${lon} ${lat}
-        done
-    else
-        plot_timeseries
-    fi
+    plot_timeseries ${3}
 elif [ "${mode}" == "baseline" ];then
     plot_baseline
 elif [ "${mode}" == "gps" ];then
@@ -885,3 +917,7 @@ elif [ "${mode}" == "image" ];then
 else
     help
 fi
+
+end=$(date +%s.%N)
+runtime=$(echo "${end} - ${start}" | bc)
+echo "Runtime was ${runtime}"
