@@ -618,38 +618,43 @@ function plot_timeseries(){
             echo "Batch processing...."
             echo "Plotting PS ${PS_Center_Lon} ${PS_Center_Lat}"
         done
-    else
     fi
+
+    F_Lon=`echo "${PS_Center_Lon}-0.00001" | bc`
+    L_Lon=`echo "${PS_Center_Lon}+0.00001" | bc`
+    U_Lat=`echo "${PS_Center_Lat}+0.00001" | bc`
+    L_Lat=`echo "${PS_Center_Lat}-0.00001" | bc`
 
     setting_output ${PS_Center_Lon} ${PS_Center_Lat}
     Crop_Identify=0
     until [ "${Crop_Identify}" -eq "1" ]
     do
-        F_Lon=`echo "${PS_Center_Lon}-0.00001" | bc`
+        F_Lon=`echo "${F_Lon}-0.00001" | bc`
         Distance=`m2ll ${F_Lon} ${PS_Center_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
     done
     Crop_Identify=0
     until [ "${Crop_Identify}" -eq "1" ]
     do
-        L_Lon=`echo "${PS_Center_Lon}+0.00001" | bc`
+        L_Lon=`echo "${L_Lon}+0.00001" | bc`
         Distance=`m2ll ${L_Lon} ${PS_Center_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
     done
     Crop_Identify=0
     until [ "${Crop_Identify}" -eq "1" ]
     do
-        U_Lat=`echo "${PS_Center_Lat}+0.00001" | bc`
+        U_Lat=`echo "${U_Lat}+0.00001" | bc`
         Distance=`m2ll ${PS_Center_Lon} ${U_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
     done
     Crop_Identify=0
     until [ "${Crop_Identify}" -eq "1" ]
     do
-        L_Lat=`echo "${PS_Center_Lat}-0.00001" | bc`
+        L_Lat=`echo "${L_Lat}-0.00001" | bc`
         Distance=`m2ll ${PS_Center_Lon} ${L_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
     done
+    echo ${F_Lon} ${L_Lon} ${U_Lat} ${L_Lat}
     end=$(date +%s.%N)
     runtime=$(echo "${end} - ${start}" | bc)
     echo "Runtime 1 was ${runtime}"
