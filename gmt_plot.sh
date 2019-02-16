@@ -749,11 +749,10 @@ function plot_timeseries(){
             echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
             for (( j=0; j<${Date_Count}; j=j+1 ))
             do
-                echo "grep"
-                time grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'
                 echo "sed"
-                time sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'
-                data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+                time data=`sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
+                echo "grep"
+                time data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
                 line=${line}\ ${data}
                 echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
             done
