@@ -752,7 +752,7 @@ function plot_timeseries(){
                 echo "sed"
                 time data=`sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
                 echo "grep"
-                time data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+                time data=`grep ${Lon}.*${Lat} ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
                 line=${line}\ ${data}
                 echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
             done
