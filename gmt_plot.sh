@@ -694,39 +694,9 @@ function plot_timeseries(){
     echo "Calculate PS inside selected range...."
     PS_Select=0
 
-    # for (( i=0; i<${Date_Count}; i=i+1 ))
-    # do
-    #     # echo ${Input_FilesArray[${i}]}
-    #     for (( j=0; j<${PS_Count}; j=j+1 ))
-    #     do
-    #         Lon=`echo ${LonArray[${j}]} | awk '{printf("%.7e",$1)}'`
-    #         Lat=`echo ${LatArray[${j}]} | awk '{printf("%.7e",$1)}'`
-    #         echo Checking ${Lon} ${Lat}
-    #         Distance=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
-    #         Identify=`gmt math -Q ${PS_Radius} ${Distance} GE =`
-    #         if [ "${Identify}" -eq "1" ];then
-    #             echo "> -Z"${j} >> tmp_TS_${i}.txt
-    #             echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
-    #             data=`sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
-    #             line=${line}\ ${data}
-    #             echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
-    #             # for (( j=0; j<${Date_Count}; j=j+1 ))
-    #             # do
-    #             #     data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
-    #             #     line=${line}\ ${data}
-    #             #     echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
-    #             # done
-    #             echo ${line} >> tmp_TS_Data.txt
-    #             PS_Select=$((PS_Select+1))
-    #             unset line
-    #             if [ "$Plot_single_PS" == "true" ];then
-    #                 gmt psxy -R -J -S${psxy_Size} -Ccategorical.cpt -O -K tmp_TS.txt >> ${Output_File}
-    #             fi
-    #         fi
-    #     done
-    # done
-    for (( i=0; i<${PS_Count}; i=i+1 ))
+    for (( i=0; i<${Date_Count}; i=i+1 ))
     do
+<<<<<<< HEAD
         Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
         Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
         echo Checking $Lon $Lat
@@ -746,20 +716,67 @@ function plot_timeseries(){
                 time grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'
                 echo "sed"
                 time sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'
+=======
+        # echo ${Input_FilesArray[${i}]}
+        for (( j=0; j<${PS_Count}; j=j+1 ))
+        do
+            Lon=`echo ${LonArray[${j}]} | awk '{printf("%.7e",$1)}'`
+            Lat=`echo ${LatArray[${j}]} | awk '{printf("%.7e",$1)}'`
+            echo Checking ${Lon} ${Lat}
+            Distance=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+            Identify=`gmt math -Q ${PS_Radius} ${Distance} GE =`
+            if [ "${Identify}" -eq "1" ];then
+                echo "> -Z"${j} >> tmp_TS_${i}.txt
+                echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
+>>>>>>> ece94982830a8f6ac9b8402286334603a4b20942
                 data=`sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
                 line=${line}\ ${data}
                 echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
-            done
-            echo ${line} >> tmp_TS_Data.txt
-            PS_Select=$((PS_Select+1))
-            unset line
-            if [ "$Plot_single_PS" == "true" ];then
-                gmt psxy -R -J -S${psxy_Size} -Ccategorical.cpt -O -K tmp_TS.txt >> ${Output_File}
+                # for (( j=0; j<${Date_Count}; j=j+1 ))
+                # do
+                #     data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+                #     line=${line}\ ${data}
+                #     echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
+                # done
+                echo ${line} >> tmp_TS_Data.txt
+                PS_Select=$((PS_Select+1))
+                unset line
+                if [ "$Plot_single_PS" == "true" ];then
+                    gmt psxy -R -J -S${psxy_Size} -Ccategorical.cpt -O -K tmp_TS.txt >> ${Output_File}
+                fi
             fi
-        else
-            continue
-        fi
+        done
     done
+    # for (( i=0; i<${PS_Count}; i=i+1 ))
+    # do
+    #     Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
+    #     Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
+    #     echo Checking $Lon $Lat
+    #     # Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
+    #     # Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
+    #     # r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+    #     # R2=`gmt math -Q ${PS_Radius} SQR =`
+    #     r2=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
+    #     Identify=`gmt math -Q ${PS_Radius} ${r2} GE =`
+    #     if [ "${Identify}" -eq "1" ];then
+    #         echo "> -Z"${i} >> tmp_TS.txt
+    #         echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
+    #         for (( j=0; j<${Date_Count}; j=j+1 ))
+    #         do
+    #             data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+    #             line=${line}\ ${data}
+    #             echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
+    #         done
+    #         echo ${line} >> tmp_TS_Data.txt
+    #         PS_Select=$((PS_Select+1))
+    #         unset line
+    #         if [ "$Plot_single_PS" == "true" ];then
+    #             gmt psxy -R -J -S${psxy_Size} -Ccategorical.cpt -O -K tmp_TS.txt >> ${Output_File}
+    #         fi
+    #     else
+    #         continue
+    #     fi
+    # done
     echo -e "\e[1;31mTotal ${PS_Select} PS selected.\e[0m"
     # 繪製平均曲線與誤差
     MeanArray=(`gmt math -Ca -S tmp_TS_Data.txt MEAN =`)
