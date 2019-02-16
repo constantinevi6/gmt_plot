@@ -730,6 +730,10 @@ function plot_timeseries(){
         Lon=`echo ${LonArray[${i}]} | awk '{printf("%.7e",$1)}'`
         Lat=`echo ${LatArray[${i}]} | awk '{printf("%.7e",$1)}'`
         echo Checking $Lon $Lat
+        # Lon_Sub=`gmt math -Q ${Lon} ${PS_Center_Lon} SUB =`
+        # Lat_Sub=`gmt math -Q ${Lat} ${PS_Center_Lat} SUB =`
+        # r2=`gmt math -Q ${Lon_Sub} ${Lat_Sub} R2 =`
+        # R2=`gmt math -Q ${PS_Radius} SQR =`
         Distance=`m2ll ${Lon} ${Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Identify=`gmt math -Q ${PS_Radius} ${Distance} GE =`
         if [ "${Identify}" -eq "1" ];then
@@ -737,6 +741,11 @@ function plot_timeseries(){
             echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
             for (( j=0; j<${Date_Count}; j=j+1 ))
             do
+                #data=`grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'`
+                echo "grep"
+                time grep ${Lon}.*${Lat} tmp_${j}.txt | awk '{printf("%.8f\n",$3)}'
+                echo "sed"
+                time sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'
                 data=`sed "${LineArray[j]}"'!d' ${Input_FilesArray[${i}]} | awk '{printf("%.8f\n",$3)}'`
                 line=${line}\ ${data}
                 echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
