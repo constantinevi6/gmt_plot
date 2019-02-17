@@ -5,7 +5,17 @@
 # 2018/07/24 CV 初版
 #
 function help(){
-    echo "This is a help information."
+    echo
+    echo "GMT plot program by Constantine VI."
+    echo "Support mode:"
+    echo "  Velocity: plot PSI mean velocity"
+    echo "  Deformation: plot PSI deformation"
+    echo "  Time Series: plot PSI time series in select area"
+    echo "  Baseline: plot interferogram baseline"
+    echo "  Image: plot interferogram/DEM/optical images"
+    echo "  GPS: plot GPS time series"
+    echo
+    echo "Usage: gmt_plot.sh [Mode] [Congifure File] [Input File]"
 }
 
 function help_config(){
@@ -208,7 +218,11 @@ function config_psxy_timeseries(){
     echo "psxy_Size_Mean=c0.2" >> ${config}
     echo "psxy_G=black" >> ${config}
     echo "## 設定連線樣式" >> ${config}
+    echo "Plot_Mean_PS_W=false" >> ${config}
     echo "psxy_W=1p" >> ${config}
+    echo "## 設定Errorbar" >> ${config}
+    echo "Plot_Errorbar=false" >> ${config}
+    echo "Errorbar_W=1p" >> ${config}
 
     echo "## 設定PS中心座標與範圍，範圍單位:m" >> ${config}
     echo "PS_Center_Lon=" >> ${config}
@@ -328,8 +342,10 @@ function setting_argument(){
     if [ "${psxy_W}" == "-" ];then
         psxy_W=-W${psxy_W}
     elif [ ! -z "${psxy_W}" ];then
-        errorbar=-Ey/${psxy_W}
         psxy_W=-W${psxy_W}
+    fi
+    if [ "${Plot_Errorbar}" == "true" ];then
+        errorbar=-Ey/${Errorbar_W}
     fi
 }
 
@@ -614,7 +630,6 @@ function plot_timeseries(){
         PS_Center_Lat=${2}
     fi
     #計算範圍
-    
     F_Lon=`echo "${PS_Center_Lon}-0.00001" | bc`
     L_Lon=`echo "${PS_Center_Lon}+0.00001" | bc`
     U_Lat=`echo "${PS_Center_Lat}+0.00001" | bc`
@@ -648,23 +663,16 @@ function plot_timeseries(){
         Distance=`lonlat2m ${PS_Center_Lon} ${L_Lat} ${PS_Center_Lon} ${PS_Center_Lat}`
         Crop_Identify=`gmt math -Q ${Distance} ${PS_Radius} GE =`
     done
-    echo ${F_Lon} ${L_Lon} ${U_Lat} ${L_Lat}
-    end=$(date +%s.%N)
-    runtime=$(echo "${end} - ${start}" | bc)
-    echo "Runtime 1 was ${runtime}"
 
     #載入座標資料
     echo Load data.
     Input_FilesArray=(`ls -v ${Input_Data}`)
     cat ${Input_LonLat} | awk '$1>'"${F_Lon}"' && $1<'"${L_Lon}"' && $2<'"${U_Lat}"' && $2>'"${L_Lat}" > tmp_Candidates.txt
-    
-    end=$(date +%s.%N)
-    runtime=$(echo "${end} - ${start}" | bc)
-    echo "Runtime 2 was ${runtime}"
 
     PS_Count=`wc -l tmp_Candidates.txt | awk '{print $1}'`
     if [ "${PS_Count}" -eq 0 ];then
-        echo "\e[1;31mNo PS found in select area.\e[0m"
+        echo -e "\e[1;31mNo PS found in select area.\e[0m"
+        rm tmp_*
         return 1
     fi
 
@@ -707,12 +715,14 @@ function plot_timeseries(){
     MeanArray=(`gmt math -Ca -S tmp_TS_Data.txt MEAN =`)
     StdArray=(`gmt math -Ca -S tmp_TS_Data.txt STD =`)
     echo "> -Z0" >> tmp_TS_Mean_Error.txt
-    echo "Drawing error bar...."
+    echo "Drawing mean time series...."
     for (( j=0; j<${Date_Count}; j=j+1 ))
     do
         echo ${DateArray[${j}]} ${MeanArray[${j}]} ${StdArray[${j}]} >> tmp_TS_Mean_Error.txt
     done
-    gmt psxy -R -J ${psxy_W} -O -K tmp_TS_Mean_Error.txt >> ${Output_File}
+    if [ "${Plot_Mean_PS_W}" == "true" ];then
+        gmt psxy -R -J ${psxy_W} -O -K tmp_TS_Mean_Error.txt >> ${Output_File}
+    fi
     gmt psxy -R -J -S${psxy_Size_Mean} -G${psxy_G} ${errorbar} -O -K tmp_TS_Mean_Error.txt >> ${Output_File}
     echo "75 98 Central Lon : ${PS_Center_Lon}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${Output_File}
     echo "75 92 Central Lat : ${PS_Center_Lat}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
@@ -887,8 +897,10 @@ define_io
 define_configure
 
 if [ "${mode}" == "velocity" ];then
+    echo "Start to plot PSI velocity...."
     plot_velocity
 elif [ "${mode}" == "deformation" ];then
+    echo "Start to plot PSI deformation...."
     plot_deformation
 elif [ "${mode}" == "timeseries" ];then
     if [ -f "${3}" ];then
@@ -897,18 +909,22 @@ elif [ "${mode}" == "timeseries" ];then
         do
             PS_Center_Lon=`echo ${LonLat} | awk 'BEGIN {FS = ","} {print $1}'`
             PS_Center_Lat=`echo ${LonLat} | awk 'BEGIN {FS = ","} {print $2}'`
-            echo "Batch processing...."
+            echo "Batch processing for time series...."
             echo "Plotting PS ${PS_Center_Lon} ${PS_Center_Lat}"
             plot_timeseries ${PS_Center_Lon} ${PS_Center_Lat}
         done
     else
+        echo "Start to plot PSI time series...."
         plot_timeseries
     fi
 elif [ "${mode}" == "baseline" ];then
+    echo "Start to plot interferogram baseline...."
     plot_baseline
 elif [ "${mode}" == "gps" ];then
+    echo "Start to plot GPS time series...."
     plot_gps
 elif [ "${mode}" == "image" ];then
+    echo "Start to plot image...."
     plot_image
 else
     help
