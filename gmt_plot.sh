@@ -881,6 +881,10 @@ function plot_baseline(){
     rm temp.ps
 }
 
+function plot_profile(){
+    
+}
+
 start=$(date +%s.%N)
 
 # 讀取設定檔
@@ -926,6 +930,9 @@ elif [ "${mode}" == "gps" ];then
 elif [ "${mode}" == "image" ];then
     echo "Start to plot image...."
     plot_image
+elif [ "${mode}" == "profile" ];then
+    echo "Start to plot profile...."
+    plot_profile
 else
     help
 fi
