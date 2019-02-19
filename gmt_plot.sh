@@ -392,10 +392,10 @@ function define_edge_cpt(){
 function crop_image(){
     Basemap_Output=${Basemap_Output}_${Basemap_Type}.tif
     if [ -f "${Basemap_Output}" ];then
-        basemap_crop_xmin=`grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $3}'`
-        basemap_crop_xmax=`grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $5}'`
-        basemap_crop_ymin=`grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $3}'`
-        basemap_crop_ymax=`grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $5}'`
+        basemap_crop_xmin=`gmt grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $3}'`
+        basemap_crop_xmax=`gmt grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $5}'`
+        basemap_crop_ymin=`gmt grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $3}'`
+        basemap_crop_ymax=`gmt grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $5}'`
         First_Lon_Sub=`gmt math -Q ${Edge_Left} ${basemap_crop_xmin} SUB ABS 0.0001 GT =`
         Last_Lon_Sub=`gmt math -Q ${Edge_Right} ${basemap_crop_xmax} SUB ABS 0.0001 GT =`
         Lower_Lat_Sub=`gmt math -Q ${Edge_Lower} ${basemap_crop_ymin} SUB ABS 0.0001 GT =`
@@ -882,7 +882,7 @@ function plot_baseline(){
 }
 
 function plot_profile(){
-    
+    help
 }
 
 start=$(date +%s.%N)
