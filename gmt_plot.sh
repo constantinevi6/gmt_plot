@@ -230,6 +230,25 @@ function config_psxy_timeseries(){
     echo "PS_Radius=10" >> ${config}
 }
 
+function config_psxy_profile(){
+    echo "# psxy setting" >> ${config}
+    echo "## 設定資料點樣式與大小，格式=[樣式代號][大小]，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
+    echo "## 是否繪製地形" >> ${config}
+    echo "Plot_topography=true" >> ${config}
+    echo "## 設定連線樣式" >> ${config}
+    echo "psxy_W=1p" >> ${config}
+    echo "## 是否繪製平均速度場" >> ${config}
+    echo "Plot_Mean_V=ture" >> ${config}
+    echo "psxy_Size_Mean=c0.2" >> ${config}
+    echo "psxy_G=black" >> ${config}
+
+    echo "## 設定起始與終點座標" >> ${config}
+    echo "StartLon=" >> ${config}
+    echo "StartLat=" >> ${config}
+    echo "EndLon=" >> ${config}
+    echo "EndLat=" >> ${config}
+}
+
 function config_scale(){
     echo "# scale setting" >> ${config}
     echo "## 圖例文字說明" >> ${config}
@@ -284,7 +303,7 @@ function config_default_v(){
 function config_default_ts(){
     Map_Projection=X
     Map_Width=9
-    Map_High=6
+    Map_High=4
     Map_Bax=1
     Map_Bbx=3
     Map_Bay=50
@@ -396,15 +415,15 @@ function crop_image(){
         basemap_crop_xmax=`gmt grdinfo ${Basemap_Output} | grep 'x_min' | awk '{print $5}'`
         basemap_crop_ymin=`gmt grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $3}'`
         basemap_crop_ymax=`gmt grdinfo ${Basemap_Output} | grep 'y_min' | awk '{print $5}'`
-        First_Lon_Sub=`gmt math -Q ${Edge_Left} ${basemap_crop_xmin} SUB ABS 0.0001 GT =`
-        Last_Lon_Sub=`gmt math -Q ${Edge_Right} ${basemap_crop_xmax} SUB ABS 0.0001 GT =`
-        Lower_Lat_Sub=`gmt math -Q ${Edge_Lower} ${basemap_crop_ymin} SUB ABS 0.0001 GT =`
-        Upper_Lat_Sub=`gmt math -Q ${Edge_Upper} ${basemap_crop_ymax} SUB ABS 0.0001 GT =`
-        if [ "${First_Lon_Sub}" -eq 1 ] || [ "${Last_Lon_Sub}" -eq 1 ] ||[ "${Lower_Lat_Sub}" -eq 1 ] ||[ "${Upper_Lat_Sub}" -eq 1 ];then
-            gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap_Path} ${Basemap_Output}
+        First_Lon_Sub=`gmt math -Q ${1} ${basemap_crop_xmin} SUB 0 EQ =`
+        Last_Lon_Sub=`gmt math -Q ${2} ${basemap_crop_xmax} SUB 0 EQ =`
+        Lower_Lat_Sub=`gmt math -Q ${3} ${basemap_crop_ymin} SUB 0 EQ =`
+        Upper_Lat_Sub=`gmt math -Q ${4} ${basemap_crop_ymax} SUB 0 EQ =`
+        if [ "${First_Lon_Sub}" -eq 0 ] || [ "${Last_Lon_Sub}" -eq 0 ] ||[ "${Lower_Lat_Sub}" -eq 0 ] ||[ "${Upper_Lat_Sub}" -eq 0 ];then
+            gdal_translate -projwin ${1} ${2} ${3} ${4} -of GTiff ${Basemap_Path} ${Basemap_Output}
         fi
     else
-        gdal_translate -projwin ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower} -of GTiff ${Basemap_Path} ${Basemap_Output}
+        gdal_translate -projwin ${1} ${2} ${3} ${4} -of GTiff ${Basemap_Path} ${Basemap_Output}
     fi
     # 計算DEM陰影
     if [ "${Basemap_Type}" == "DEM" ];then
@@ -564,7 +583,7 @@ function plot_velocity(){
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
     if [ "${Plot_Basemap}" == "true" ];then
-        crop_image
+        crop_image ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower}
         plot_basemap_image
     else
         echo Skipping plot image.
@@ -776,7 +795,7 @@ function plot_image(){
 
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
-    crop_image
+    crop_image ${Edge_Left} ${Edge_Upper} ${Edge_Right} ${Edge_Lower}
     plot_basemap_image
     
     if [ "${Addition_Layers}" ];then
@@ -882,7 +901,57 @@ function plot_baseline(){
 }
 
 function plot_profile(){
-    help
+    if [ ! -f "${config}" ];then
+        Input_X=${Input_Date}
+        Input_Y=${Input_Bperp}
+        define_edge
+        config_default_ts
+        help_config
+        config_gereral
+        config_io
+        config_psbasemap
+        config_basemap_image
+        config_psxy_profile
+        config_title LOS Velocity Profile
+        exit 1
+    fi
+
+    setting_config
+    setting_argument
+    setting_XYOffset 3 4
+    setting_output
+    start=${StartLon}/${StartLat}
+    end=${EndLon}/${EndLat}
+    echo "Project ${Input_Data} into tmp_${Input_Data}_profile.gmt files"
+    gmt project ${Input_Data} -C${start} -E${end} -W-0.01/0.01 -Lw -Fxypz -Q > tmp_${Input_Data}_profile.gmt
+    echo "Project DEM into tmp_topo_profile.gmt"
+    gmt project -C${start} -E${end} -G0.005 -Q > tmp_profile.gmt
+    if [ `gmt math -Q ${StartLon} ${EndLon} GT =` -eq 1 ];then
+        win_start_x=${EndLon}
+        win_end_x=${StartLon}
+    else
+        win_start_x=${StartLon}
+        win_end_x=${EndLon}
+    fi
+    if [ `gmt math -Q ${StartLat} ${EndLat} GT =` -eq 1 ];then
+        win_start_y=${EndLat}
+        win_end_y=${StartLat}
+    else
+        win_start_y=${StartLat}
+        win_end_y=${EndLat}
+    fi
+    crop_image ${win_start_x} ${win_end_y} ${win_end_x} ${win_start_y}
+    gmt grdtrack tmp_profile.gmt -G${Basemap_Output} > tmp_topo_profile.gmt
+    
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BSen+t"${Title}" -Bx${psbasemap_Bx}+l"Distence (m)" ${X} ${Y} -K > ${Output_File}
+    gmt psxy tmp_topo_profile.gmt -i2,3 -R -J -BE -By${psbasemap_By}+l"Elevation (m)" -O -K >> ${Output_File}
+    gmt psxy tmp_${Input_Data}_profile.gmt -i2,3 -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -BW -By${psbasemap_By}+l"LOS Velocity (mm/year)" -S${psxy_Size_Mean} -G${psxy_G} -O -K >> ${Output_File}
+
+    # 封檔
+    gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
+    #刪除暫存檔
+    rm tmp_*
 }
 
 start=$(date +%s.%N)
