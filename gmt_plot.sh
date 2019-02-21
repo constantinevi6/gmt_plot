@@ -601,7 +601,7 @@ function plot_velocity(){
     plot_coastline
     plot_legend ps.cpt
     psbasemap -R -J -O -K -TdjRT+w2c+f+l,,,N+o1c/1.8c -F+c0.2c/0.2c/0.2c/1c+gwhite@50+r0.5c >> ${Output_File}
-    psbasemap -R -J -O -K -LjRB+c22+w10k+f+o2c/2c+u -F+gwhite@50 >> >> ${Output_File}
+    psbasemap -R -J -O -K -LjRB+c22+w10k+f+o2c/2c+u -F+gwhite@50 >> ${Output_File}
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
