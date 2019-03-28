@@ -593,6 +593,7 @@ function plot_velocity(){
         config_psxy_PS
         config_scale
         config_addition_layer
+        config_map_objects
         config_title PS Velocity Plot
         exit 1
     fi
