@@ -279,6 +279,29 @@ function config_addition_layer(){
     echo "" >> ${config}
 }
 
+function config_map_objects(){
+    echo "# 地圖物件" >> ${config}
+    echo "## 是否繪製海岸線(海岸線資料由GMT提供)" >> ${config}
+    echo "CoastLine=true" >> ${config}
+    echo "## 是否繪製指北針" >> ${config}
+    echo "Compass=false" >> ${config}
+    echo "## 設定指北針樣式" >> ${config}
+    echo "Compass_position=LT  #R=右 L=左/T=上 B=下" >> ${config}
+    echo "Compass_offset_X=1  #單位：公分" >> ${config}
+    echo "Compass_offset_Y=2  #單位：公分" >> ${config}
+    echo "Compass_width=2  #單位：公分" >> ${config}
+    echo "Compass=true" >> ${config}
+    echo "## 是否繪製比例尺" >> ${config}
+    echo "Scale=true" >> ${config}
+    echo "## 設定比例尺樣式" >> ${config}
+    echo "Scale_position=RB  #R=右 L=左/T=上 B=下" >> ${config}
+    echo "Scale_offset_X=2  #單位：公分" >> ${config}
+    echo "Scale_offset_Y=2  #單位：公分" >> ${config}
+    echo "Scale_length=10 #單位：公里" >> ${config}
+    echo "Scale_align=t  #比例尺標籤位置 r/l/t/b" >> ${config}
+    echo "" >> ${config}
+}
+
 function config_title(){
     argvs=$@
     for argv in ${argvs}
@@ -598,10 +621,17 @@ function plot_velocity(){
         plot_add_layer
     fi
 
-    plot_coastline
+    if [ "${CoastLine}" == "true" ];then
+        plot_coastline
+    fi
+    if [ "${Compass}" == "true" ];then
+        gmt psbasemap -R -J -O -K -Tdj${Compass_position}+w${Compass_width}c+f+l,,,N+o${Compass_offset_X}c/${Compass_offset_Y}c -F+c0.2c/0.2c/0.2c/1c+gwhite@50+r0.2c >> ${Output_File}
+    fi
+    if [ "${Scale}" == "true" ];then
+        gmt psbasemap -R -J -O -K -Lj${Scale_position}+c${Edge_Lower}+w${Scale_length}k+f+o${Scale_offset_X}c/${Scale_offset_Y}c+u+a${Scale_align} -F+gwhite@50 >> ${Output_File}
+    fi
+    
     plot_legend ps.cpt
-    gmt psbasemap -R -J -O -K -TdjRT+w2c+f+l,,,N+o1c/1.8c -F+c0.2c/0.2c/0.2c/1c+gwhite@50+r0.5c >> ${Output_File}
-    gmt psbasemap -R -J -O -K -LjRB+c22+w10k+f+o2c/2c+u -F+gwhite@50 >> ${Output_File}
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
