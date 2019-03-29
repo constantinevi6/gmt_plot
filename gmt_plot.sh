@@ -845,9 +845,13 @@ function plot_gps(){
     if [ ! -f "${config}" ];then
         config_default_gps
         help_config
-        define_io ${1}
-        define_edge_time_GPS
-        define_edge_y ${1} 7 50
+        if [ ! -f "${1}" ];then
+            define_io ${1}
+            define_edge_time_GPS
+            define_edge_y ${1} 7 50
+        else
+            define_io
+        fi
         config_gereral
         config_io
         config_psbasemap
