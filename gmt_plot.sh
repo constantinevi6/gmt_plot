@@ -913,11 +913,11 @@ function plot_gps_los(){
     setting_output ${Input_Data}
     read_edge_time_GPS
 
-    StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
-    StartDay=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
-    StartYearDay=`gmt math -Q ${StartDay} 365 DIV =`
-    Start_YearDate=`gmt math -Q ${StartYearDay} ${StartYear} ADD =`
     if [ -n ${StartDate} ];then
+        StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
+        StartDay=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
+        StartYearDay=`gmt math -Q ${StartDay} 365 DIV =`
+        Start_YearDate=`gmt math -Q ${StartYearDay} ${StartYear} ADD =`
         LOS_Offset=`cat ${Input_Data} | awk '{printf("%.8f %.8f\n",$1,$2)}' | grep ${Start_YearDate} | awk '{print $2}'`
         if [ -z ${LOS_Offset} ];then
             Date_Offset=`gmt math -C0 ${Input_Data} ${Start_YearDate} SUB ABS = | gmt info -C -o0`
