@@ -237,6 +237,8 @@ function config_gps_timeseries(){
     echo "psxy_LonG=red" >> ${config}
     echo "psxy_LatG=green" >> ${config}
     echo "psxy_HG=blue" >> ${config}
+    echo "## 設定起點日期之值為0" >> ${config}
+    echo "StartDate=" >> ${config}
 }
 
 function config_psxy_profile(){
@@ -845,7 +847,7 @@ function plot_gps(){
     if [ ! -f "${config}" ];then
         config_default_gps
         help_config
-        if [ ! -f "${1}" ];then
+        if [ -n "${1}" ];then
             define_io ${1}
             define_edge_time_GPS
             define_edge_y ${1} 7 50
@@ -861,28 +863,78 @@ function plot_gps(){
     fi
     
     setting_config
+    setting_argument
     GPS_Name=`echo ${Input_Data} | awk -F. '{printf("%s\n",$1)}'`
     GPS_Lon=`sed -n 1p ${Input_Data} | awk '{printf("%.4f\n",$3)}'`
     GPS_Lat=`sed -n 1p ${Input_Data} | awk '{printf("%.4f\n",$2)}'`
     setting_output ${GPS_Name}
     read_edge_time_GPS
-    # 載入數據
-    DateArray=(`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}'`)
-    Date_Count=`wc -l ${Input_Data} | awk '{print $1}'`
+
     # 繪製原始資料
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd PS_MEDIA A3 PS_PAGE_ORIENTATION portrait
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -JX9i/4i -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o+l"Time" -Bpya${Map_Bay}f${Map_Bby}+l"Height (mm)" -BWSen -X1.5i -Y1.5i > ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o+l"Time" -Bpya${Map_Bay}f${Map_Bby}+l"Height (mm)" -BWSen -X1.5i -Y1.5i > ${Output_File}
     awk '{print $1, $7}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
 
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Latitude (mm)" -BWSen -Y5i >> ${Output_File}
     awk '{print $1, $6}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LatG} -K -O -V >> ${Output_File}
 
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen+t"GPS Time Series Plot" -Y5i >> ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen+t"${Title}" -Y5i >> ${Output_File}
     awk '{print $1, $5}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LonG} -K -O -V >> ${Output_File}
 
     echo "75 96 GPS Station : ${GPS_Name}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${Output_File}
     echo "75 90 Lat : ${GPS_Lon}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
     echo "75 84 Lon : ${GPS_Lat}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
+    gmt psxy -R -J -T -O >> ${Output_File}
+    convert_fig
+}
+
+function plot_gps_los(){
+    if [ ! -f "${config}" ];then
+        config_default_gps
+        help_config
+        if [ -n "${1}" ];then
+            define_io ${1}
+            define_edge_time_GPS
+            define_edge_y ${1} 2 50
+        else
+            define_io
+        fi
+        config_gereral
+        config_io
+        config_psbasemap
+        config_gps_timeseries
+        config_title GPS Time Series Plot
+        exit 1
+    fi
+
+    setting_config
+    setting_argument
+    setting_XYOffset 3 4
+    setting_output ${Input_Data}
+    read_edge_time_GPS
+
+    StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
+    StartDay=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
+    StartYearDay=`gmt math -Q ${StartDay} 365 DIV =`
+    Start_YearDate=`gmt math -Q ${StartYearDay} ${StartYear} ADD =`
+    if [ -n ${StartDate} ];then
+        LOS_Offset=`cat ${Input_Data} | awk '{printf("%.8f %.8f\n",$1,$2)}' | grep ${Start_YearDate} | awk '{print $2}'`
+        if [ -z ${LOS_Offset} ];then
+            Date_Offset=`gmt math -C0 ${Input_Data} ${Start_YearDate} SUB ABS = | gmt info -C -o0`
+            Start_YearDate=`gmt math -Q ${Start_YearDate} ${Date_Offset} SUB =`
+            LOS_Offset=`cat ${Input_Data} | awk '{printf("%.8f %.8f\n",$1,$2)}' | grep ${Start_YearDate} | awk '{print $2}'`
+        fi
+        if [ -z ${LOS_Offset} ];then
+            Start_YearDate=`gmt math -Q ${Start_YearDate} ${Date_Offset} ADD =`
+            LOS_Offset=`cat ${Input_Data} | awk '{printf("%.8f %.8f\n",$1,$2)}' | grep ${Start_YearDate} | awk '{print $2}'`
+        fi
+    fi
+	if [ -z ${LOS_Offset} ];then
+		LOS_Offset=0	
+	fi
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"LOS (mm)" -BWSen+t"${Title}" ${X} ${Y} > ${Output_File}
+    awk '{print $1, $2-'${LOS_Offset}'}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
+
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
 }
@@ -1109,12 +1161,20 @@ elif [ "${mode}" == "baseline" ];then
     echo "Start to plot interferogram baseline...."
     plot_baseline
 elif [ "${mode}" == "gps" ];then
-    if [ -f "${3}" ];then
+    if [ -n "${3}" ];then
         echo "Start to plot GPS time series for file: ${3}...."
         plot_gps ${3}
     else
         echo "Start to plot GPS time series...."
         plot_gps
+    fi
+elif [ "${mode}" == "gpslos" ];then
+    if [ -n "${3}" ];then
+        echo "Start to plot LOS time series for GPS file: ${3}...."
+        plot_gps_los ${3}
+    else
+        echo "Start to plot GPS time series for GPS...."
+        plot_gps_los
     fi
 elif [ "${mode}" == "image" ];then
     echo "Start to plot image...."

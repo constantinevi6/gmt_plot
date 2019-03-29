@@ -33,7 +33,7 @@ echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
 echo "\"" >> ${config}
 echo "## 輸入與輸出" >> ${config}
 echo "Input_Data=" >> ${config}
-echo "Output_File=GMT_GPS_LOS" >> ${config}
+echo "Output_File=GMT_gps_los" >> ${config}
 echo "## 輸出圖檔格式，支援JPG、PNG、PDF、TIFF、BMP、EPS、PPM、SVG" >> ${config}
 echo "Output_Figure_Format=PNG" >> ${config}
 echo "## 自動裁切空白的部分" >> ${config}
@@ -60,9 +60,9 @@ echo "" >> ${config}
 echo "# Plot setting" >> ${config}
 echo "## 設定資料點樣式與大小，格式=[樣式代號][大小]，樣式代號: c=圓形，a=星形，d=菱形，s=正方形" >> ${config}
 echo "psxy_Size=c0.1" >> ${config}
-echo "psxy_LonG=red" >> ${config}
-echo "psxy_LatG=green" >> ${config}
 echo "psxy_HG=blue" >> ${config}
+echo "## 設定起點日期" >> ${config}
+echo "StartDate=" >> ${config}
 
 exit 1
 fi
@@ -82,11 +82,11 @@ Last_YearDate=`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}' | gmt info -C | c
 FirstYear=`cat ${Input_Data} | awk '{printf("%d\n",$1)}' | gmt info -C | cut -f1`
 FirstDay=`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}' | gmt info -C | cut -f1`
 FirstDay=`gmt math -Q ${FirstDay} ${FirstYear} SUB =`
-FirstDay=`gmt math -Q ${FirstDay} 365 MUL = | awk '{printf("%d\n",$1)}'`
+FirstDay=`gmt math -Q ${FirstDay} 365 MUL 1 ADD = | awk '{printf("%d\n",$1)}'`
 LastYear=`cat ${Input_Data} | awk '{printf("%d\n",$1)}' | gmt info -C | cut -f2`
 LastDay=`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}' | gmt info -C | cut -f2`
 LastDay=`gmt math -Q ${LastDay} ${LastYear} SUB =`
-LastDay=`gmt math -Q ${LastDay} 365 MUL = | awk '{printf("%d\n",$1)}'`
+LastDay=`gmt math -Q ${LastDay} 365 MUL 1 ADD = | awk '{printf("%d\n",$1)}'`
 First_Date=`echo ${FirstYear}-${FirstDay} | gmt info -fT -I1 -C | cut -f1`
 Last_Date=`echo ${LastYear}-${LastDay} | gmt info -fT -I1 -C | cut -f1`
 else
@@ -99,19 +99,26 @@ LastYear=`echo ${Last_Date} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("
 LastDay=`echo ${Last_Date} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
 LastYearDay=`gmt math -Q ${LastDay} 365 DIV =`
 Last_YearDate=`gmt math -Q ${LastYearDay} ${LastYear} ADD =`
+
+StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
+StartDay=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
+StartYearDay=`gmt math -Q ${StartDay} 365 DIV =`
+Start_YearDate=`gmt math -Q ${StartYearDay} ${StartYear} ADD =`
 fi
 
 # GMT廣域設定
 gmt gmtset ${gmt_config}
 
-# 載入數據
-DateArray=(`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}'`)
-Date_Count=`wc -l ${Input_Data} | awk '{print $1}'`
-
 # 繪製原始資料
 gmt gmtset FORMAT_DATE_IN yyyy-mm-dd PS_MEDIA A4 PS_PAGE_ORIENTATION landscape
+
+if [ -n ${StartDate} ];then
+    LOSGap=`cat ${Input_Data} | awk '{printf("%.8f %.8f\n",$1,$2)}' | grep ${Start_YearDate} | awk '{print $2}'`
+    echo ${LOSGap}
+fi
+
 gmt psbasemap -R${First_Date}/${Last_Date}/${Lower_D}/${Upper_D} -JX9i/4i -K -Bsx${YearAxis}Y -Bpxa${MonthAxis}Of${mAxis}o+l"Time" -Bpy${DAxis}+l"LOS (mm)" -BWSen+t"GPS Time Series Plot" -X1.5i -Y1.5i > ${Output_File_Name}
-awk '{print $1, $2}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Lower_D}/${Upper_D} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File_Name}
+awk '{print $1, $2-'${LOSGap}'}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Lower_D}/${Upper_D} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File_Name}
 
 gmt psxy -R -J -T -O >> ${Output_File_Name}
 
