@@ -714,10 +714,10 @@ function plot_deformation(){
 
 function plot_timeseries(){
     if [ ! -f "${config}" ];then
+        define_io ps_u-dmo_r0.*.xy
         Input_X=${Input_Date}
         Input_Y=${Input_Bperp}
         define_edge_time
-        define_io ps_u-dmo_r0.*.xy
         config_default_ts
         help_config
         config_gereral
