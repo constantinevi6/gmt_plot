@@ -115,6 +115,19 @@ function config_gereral(){
         echo "FONT_LABEL=18p,Times-Roman" >> ${config}
         echo "MAP_ANNOT_OFFSET_PRIMARY=16p" >> ${config}
         echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
+    elif [ "${mode}" == "gpslos" ];then
+        echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
+        echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
+        echo "FORMAT_DATE_MAP=o" >> ${config}
+        echo "FORMAT_TIME_PRIMARY_MAP=abbreviated" >> ${config}
+        echo "FONT=Times-Roman" >> ${config}
+        echo "FONT_LOGO=Times-Roman" >> ${config}
+        echo "FONT_TITLE=24p,Times-Roman" >> ${config}
+        echo "FONT_ANNOT_PRIMARY=20p,Times-Roman" >> ${config}
+        echo "FONT_ANNOT_SECONDARY=18p,Times-Roman" >> ${config}
+        echo "FONT_LABEL=18p,Times-Roman" >> ${config}
+        echo "MAP_ANNOT_OFFSET_PRIMARY=16p" >> ${config}
+        echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
     fi
     echo "\"" >> ${config}
     echo "" >> ${config}
@@ -932,7 +945,7 @@ function plot_gps_los(){
 	if [ -z ${LOS_Offset} ];then
 		LOS_Offset=0	
 	fi
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"LOS (mm)" -BWSen+t"${Title}" ${X} ${Y} > ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" ${X} ${Y} -K -V ${X} ${Y} > ${Output_File}
     awk '{print $1, $2-'${LOS_Offset}'}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
 
     gmt psxy -R -J -T -O >> ${Output_File}
