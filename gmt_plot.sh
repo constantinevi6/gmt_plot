@@ -945,7 +945,7 @@ function plot_gps_los(){
 	if [ -z ${LOS_Offset} ];then
 		LOS_Offset=0	
 	fi
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" ${X} ${Y} -K -V ${X} ${Y} > ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" -K -V ${X} ${Y} > ${Output_File}
     awk '{print $1, $2-'${LOS_Offset}'}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
 
     gmt psxy -R -J -T -O >> ${Output_File}
