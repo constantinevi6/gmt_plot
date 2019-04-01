@@ -635,9 +635,9 @@ function convert_fig(){
 function plot_velocity(){
     # 產生Configure
     if [ ! -f "${config}" ];then
+        define_io ps_mean_v.xy
         define_edge_geo
         define_edge_cpt
-        define_io ps_mean_v.xy
         config_default_v
 
         help_config
