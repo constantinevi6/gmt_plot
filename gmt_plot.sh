@@ -802,7 +802,7 @@ function plot_timeseries(){
     DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
     
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
-    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"Displacement (mm)" ${X} ${Y} -K -V > ${Output_File}
+    gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" ${X} ${Y} -K -V > ${Output_File}
 
     echo "Calculate PS inside selected range...."
     PS_Select=0
@@ -888,10 +888,10 @@ function plot_gps(){
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o+l"Time" -Bpya${Map_Bay}f${Map_Bby}+l"Height (mm)" -BWSen -X1.5i -Y1.5i > ${Output_File}
     awk '{print $1, $7}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
 
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Latitude (mm)" -BWSen -Y5i >> ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen -Y5i >> ${Output_File}
     awk '{print $1, $6}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LatG} -K -O -V >> ${Output_File}
 
-    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen+t"${Title}" -Y5i >> ${Output_File}
+    gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Latitude (mm)" -BWSen+t"${Title}" -Y5i >> ${Output_File}
     awk '{print $1, $5}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LonG} -K -O -V >> ${Output_File}
 
     echo "75 96 GPS Station : ${GPS_Name}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${Output_File}
@@ -926,7 +926,7 @@ function plot_gps_los(){
     setting_output ${Input_Data}
     read_edge_time_GPS
 
-    if [ -n ${StartDate} ];then
+    if [ ${StartDate} ];then
         StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
         StartDay=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
         StartYearDay=`gmt math -Q ${StartDay} 365 DIV =`
@@ -946,7 +946,7 @@ function plot_gps_los(){
 		LOS_Offset=0	
 	fi
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" -K -V ${X} ${Y} > ${Output_File}
-    awk '{print $1, $2-'${LOS_Offset}'}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
+    awk '{print $1, $2-('${LOS_Offset}')}' ${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
 
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
