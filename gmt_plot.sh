@@ -8,12 +8,14 @@ function help(){
     echo
     echo "GMT plot program by Constantine VI."
     echo "Support mode:"
-    echo "  Velocity: plot PSI mean velocity"
-    echo "  Deformation: plot PSI deformation"
-    echo "  Time Series: plot PSI time series in select area"
-    echo "  Baseline: plot interferogram baseline"
-    echo "  Image: plot interferogram/DEM/optical images"
-    echo "  GPS: plot GPS time series"
+    echo "  velocity: plot PSI mean velocity"
+    echo "  deformation: plot PSI deformation"
+    echo "  timeseries: plot PSI time series in select area"
+    echo "  baseline: plot interferogram baseline"
+    echo "  image: plot interferogram/DEM/optical images"
+    echo "  gps: plot GPS time series"
+    echo "  gpslos: plot projected GPS time series"
+    echo "  profile: plot profile of PS mean velocity"
     echo
     echo "Usage: gmt_plot.sh [Mode] [Congifure File] [Input File]"
 }
@@ -29,14 +31,6 @@ function define_io(){
     Input_Bperp=bperp.txt
     Input_SBAS=small_baselines.list
     Input_LonLat=ps_ll.txt
-}
-
-function define_io_gps(){
-    Input_Data=${1}
-    Input_Date=
-    Input_Bperp=
-    Input_SBAS=
-    Input_LonLat=
 }
 
 function define_configure(){
@@ -335,7 +329,7 @@ function config_title(){
     echo "Title=\"${Title}\" " >> ${config}
 }
 
-function config_default_v(){
+function setting_default_map_plot(){
     Map_Projection=M
     Map_Width=6
     Map_Offset_Y=4
@@ -346,7 +340,7 @@ function config_default_v(){
     scale_Label="LOS Velocity (mm/yr)"
 }
 
-function config_default_ts(){
+function setting_default_xy_plot(){
     Map_Projection=X
     Map_Width=9
     Map_High=4
@@ -356,26 +350,12 @@ function config_default_ts(){
     Map_Bby=10
 }
 
-function config_default_gps(){
-    Map_Projection=X
-    Map_Width=9
-    Map_High=4
-    Map_Bax=1
-    Map_Bbx=3
-    Map_Bay=50
-    Map_Bby=10
-}
-
-function config_ddd(){
-    exit
-}
-
-function setting_config(){
+function read_config(){
     source ${pwd}/${config}
     gmt gmtset ${gmt_config}
 }
 
-function setting_output(){
+function define_output(){
     if [ $# -eq 0 ];then
         Output_File=${Output_File_Name}.ps
     else
@@ -389,11 +369,13 @@ function setting_output(){
     fi
 }
 
-function setting_argument(){
+function define_argument(){
     psbasemap_J=${Map_Projection}${Map_Width}${Map_Width_unit}
+
     if [ ! -z "${Map_High}" ];then
         psbasemap_J=${psbasemap_J}/${Map_High}${Map_Width_unit}
     fi
+
     if [ "${Map_Projection}" == "X" ];then
         psbasemap_Bx=a${Map_Bax}f${Map_Bbx}
         psbasemap_By=a${Map_Bay}f${Map_Bby}
@@ -401,59 +383,55 @@ function setting_argument(){
         psbasemap_Bx=a${Map_Bax}b${Map_Bbx}
         psbasemap_By=a${Map_Bay}b${Map_Bby}
     fi
+
     psxy_Size=${psxy_Type}${psxy_Size}
     M_psxy_Size=${M_psxy_Type}${M_psxy_Size}
     scale_B=a${scale_Ba}f${scale_Bf}
+
     if [ "${psxy_W}" == "-" ];then
         psxy_W=-W${psxy_W}
     elif [ ! -z "${psxy_W}" ];then
         psxy_W=-W${psxy_W}
     fi
+
     if [ "${Plot_Errorbar}" == "true" ];then
         errorbar=-Ey/${Errorbar_W}
     fi
 }
 
-function setting_XYOffset(){
+function define_xy_offset(){
     if [ $# -ne 0 ];then
-    X=-X${1}
-    Y=-Y${2}
+        X=-X${1}
+        Y=-Y${2}
     fi
 }
 
-function define_edge(){
-    Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
-    Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
-    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f1`
-    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I1 -C | cut -f2`
+function read_edge_x(){
+    if [ -f "${1}" ];then
+        Edge_Left=`cat ${1} | awk '{printf("%'${2}'\n",$'${3}')}' | gmt info -I${4} -C | cut -f1`
+        Edge_Right=`cat ${1} | awk '{printf("%'${2}'\n",$'${3}')}' | gmt info -I${4} -C | cut -f2`
+    fi
 }
 
-function define_edge_y(){
-    Edge_Lower=`cat ${1} | awk '{printf("%d\n",$'${2}')}' | gmt info -I${3} -C | cut -f1`
-    Edge_Upper=`cat ${1} | awk '{printf("%d\n",$'${2}')}' | gmt info -I${3} -C | cut -f2`
-    Edge_Y=`gmt math -Q ${Edge_Lower} ${Edge_Upper} MAX =`
-    Edge_Lower=-${Edge_Y}
-    Edge_Upper=${Edge_Y}
+function read_edge_y(){
+    if [ -f "${1}" ];then
+        Edge_Lower=`cat ${1} | awk '{printf("%'${2}'\n",$'${3}')}' | gmt info -I${4} -C | cut -f1`
+        Edge_Upper=`cat ${1} | awk '{printf("%'${2}'\n",$'${3}')}' | gmt info -I${4} -C | cut -f2`
+        if [ "${5}" == "fix" ];then
+            Edge_Y=`gmt math -Q ${Edge_Lower} ${Edge_Upper} MAX =`
+            Edge_Lower=-${Edge_Y}
+            Edge_Upper=${Edge_Y}
+        fi
+    fi
 }
 
-function define_edge_time(){
+function read_edge_x_time(){
     gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
-    Edge_Left=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
-    Edge_Right=`cat ${Input_X} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
-    Edge_Lower=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f1`
-    Edge_Upper=`cat ${Input_Y} | awk '{printf("%d\n",$1)}' | gmt info -I50 -C | cut -f2`
-    Edge_Y=`gmt math -Q ${Edge_Lower} ${Edge_Upper} MAX =`
-    Edge_Lower=-${Edge_Y}
-    Edge_Upper=${Edge_Y}
+    Edge_Left=`cat ${1} | awk '{printf("%d\n",$'${2}')}' | gmt info -fT -I1 -C | cut -f1`
+    Edge_Right=`cat ${1} | awk '{printf("%d\n",$'${2}')}' | gmt info -fT -I1 -C | cut -f2`
 }
 
-function define_edge_x_time(){
-    gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyy-mm-dd
-    Edge_Left=`cat ${1} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f1`
-    Edge_Right=`cat ${1} | awk '{printf("%d\n",$1)}' | gmt info -fT -I1 -C | cut -f2`
-}
-
-function define_edge_time_GPS(){
+function read_edge_time_GPS(){
     gmt gmtset FORMAT_DATE_IN yyyy-jjj FORMAT_DATE_OUT yyyy-jjj
     First_YearDate=`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}' | gmt info -C | cut -f1`
     Last_YearDate=`cat ${Input_Data} | awk '{printf("%.8f\n",$1)}' | gmt info -C | cut -f2`
@@ -470,7 +448,7 @@ function define_edge_time_GPS(){
     Edge_Right=`echo ${LastYear}-${LastDay} | gmt info -fT -I1 -C | cut -f1`
 }
 
-function read_edge_time_GPS(){
+function define_edge_time_GPS(){
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd FORMAT_DATE_OUT yyyy-jjj
     FirstYear=`echo ${Edge_Left} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
     FirstDay=`echo ${Edge_Left} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$2)}'`
@@ -482,14 +460,7 @@ function read_edge_time_GPS(){
     Last_YearDate=`gmt math -Q ${LastYearDay} ${LastYear} ADD =`
 }
 
-function define_edge_geo(){
-    Edge_Left=`cat ${Input_LonLat} | awk '{printf("%f\n",$1)}' | gmt info -I0.1 -C | cut -f1`
-    Edge_Right=`cat ${Input_LonLat} | awk '{printf("%f\n",$1)}' | gmt info -I0.1 -C | cut -f2`
-    Edge_Upper=`cat ${Input_LonLat} | awk '{printf("%f\n",$2)}' | gmt info -I0.1 -C | cut -f2`
-    Edge_Lower=`cat ${Input_LonLat} | awk '{printf("%f\n",$2)}' | gmt info -I0.1 -C | cut -f1`
-}
-
-function define_edge_cpt(){
+function read_edge_cpt(){
     max_cpt=`cat ${Input_Data} | awk '{printf("%f\n",$3)}' | gmt info -I10 -C | cut -f2`
     min_cpt=`cat ${Input_Data} | awk '{printf("%f\n",$3)}' | gmt info -I10 -C | cut -f1`
     max_cpt_abs=`gmt math -Q ${max_cpt} ABS =`
@@ -648,9 +619,10 @@ function plot_velocity(){
     # 產生Configure
     if [ ! -f "${config}" ];then
         define_io ps_mean_v.xy
-        define_edge_geo
-        define_edge_cpt
-        config_default_v
+        read_edge_x ${Input_LonLat} f 1 0.1
+        read_edge_y ${Input_LonLat} f 1 0.1
+        read_edge_cpt
+        setting_default_map_plot
 
         help_config
         config_gereral
@@ -666,10 +638,10 @@ function plot_velocity(){
     fi
 
     # 載入參數
-    setting_config
-    setting_argument
-    setting_XYOffset 3 4
-    setting_output
+    read_config
+    define_argument
+    define_xy_offset 3 4
+    define_output
     # 底圖設定
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
@@ -708,7 +680,7 @@ function plot_velocity(){
 function plot_deformation(){
 
     if [ ! -f "${config}" ];then
-        config_default_v
+        setting_default_map_plot
         define_io ps_u-dmo_r0.*.xy
         help_config
         config_gereral
@@ -727,10 +699,9 @@ function plot_deformation(){
 function plot_timeseries(){
     if [ ! -f "${config}" ];then
         define_io ps_u-dmo_r0.*.xy
-        Input_X=${Input_Date}
-        Input_Y=${Input_Bperp}
-        define_edge_time
-        config_default_ts
+        read_edge_x_time ${Input_Date} 1
+        read_edge_y
+        setting_default_xy_plot
         help_config
         config_gereral
         config_io
@@ -740,9 +711,9 @@ function plot_timeseries(){
         exit 1
     fi
 
-    setting_config
-    setting_argument
-    setting_XYOffset 3 4
+    read_config
+    define_argument
+    define_xy_offset 3 4
     
     if [ "${1}" ] && [ "${2}" ];then
         PS_Center_Lon=${1}
@@ -753,7 +724,7 @@ function plot_timeseries(){
     L_Lon=`echo "${PS_Center_Lon}+0.00001" | bc`
     U_Lat=`echo "${PS_Center_Lat}+0.00001" | bc`
     L_Lat=`echo "${PS_Center_Lat}-0.00001" | bc`
-    setting_output ${PS_Center_Lon} ${PS_Center_Lat}
+    define_output ${PS_Center_Lon} ${PS_Center_Lat}
     Crop_Identify=0
     until [ "${Crop_Identify}" -eq "1" ]
     do
@@ -857,12 +828,12 @@ function plot_timeseries(){
 
 function plot_gps(){
     if [ ! -f "${config}" ];then
-        config_default_gps
+        setting_default_xy_plot
         help_config
         if [ -n "${1}" ];then
             define_io ${1}
-            define_edge_time_GPS
-            define_edge_y ${1} 7 50
+            read_edge_time_GPS
+            read_edge_y ${1} f 7 50 fix
         else
             define_io
         fi
@@ -874,13 +845,13 @@ function plot_gps(){
         exit 1
     fi
     
-    setting_config
-    setting_argument
+    read_config
+    define_argument
     GPS_Name=`echo ${Input_Data} | awk -F. '{printf("%s\n",$1)}'`
     GPS_Lon=`sed -n 1p ${Input_Data} | awk '{printf("%.4f\n",$3)}'`
     GPS_Lat=`sed -n 1p ${Input_Data} | awk '{printf("%.4f\n",$2)}'`
-    setting_output ${GPS_Name}
-    read_edge_time_GPS
+    define_output ${GPS_Name}
+    define_edge_time_GPS
 
     # 繪製原始資料
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd PS_MEDIA A3 PS_PAGE_ORIENTATION portrait
@@ -902,12 +873,12 @@ function plot_gps(){
 
 function plot_gps_los(){
     if [ ! -f "${config}" ];then
-        config_default_gps
+        setting_default_xy_plot
         help_config
         if [ -n "${1}" ];then
             define_io ${1}
-            define_edge_time_GPS
-            define_edge_y ${1} 2 50
+            read_edge_time_GPS
+            read_edge_y ${1} f 2 50 fix
         else
             define_io
         fi
@@ -919,11 +890,11 @@ function plot_gps_los(){
         exit 1
     fi
 
-    setting_config
-    setting_argument
-    setting_XYOffset 3 4
-    setting_output ${Input_Data}
-    read_edge_time_GPS
+    read_config
+    define_argument
+    define_xy_offset 3 4
+    define_output ${Input_Data}
+    define_edge_time_GPS
 
     if [ ${StartDate} ];then
         StartYear=`echo ${StartDate} | gmt info -fT -I1 -C | cut -f1 | awk -F- '{printf("%d\n",$1)}'`
@@ -954,8 +925,9 @@ function plot_gps_los(){
 function plot_image(){
     if [ ! -f "${config}" ];then
         define_io
-        define_edge_geo
-        config_default_v
+        read_edge_x ${Input_LonLat} f 1 0.1
+        read_edge_y ${Input_LonLat} f 1 0.1
+        setting_default_map_plot
 
         help_config
         config_gereral
@@ -967,10 +939,10 @@ function plot_image(){
         exit 1
     fi
 
-    setting_config
-    setting_argument
-    setting_XYOffset 3 4
-    setting_output
+    read_config
+    define_argument
+    define_xy_offset 3 4
+    define_output
 
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bx${psbasemap_Bx} -By${psbasemap_By} ${X} ${Y} -K -P -V > ${Output_File}
 
@@ -989,15 +961,14 @@ function plot_image(){
 }
 
 function plot_baseline(){
-    Input_X=${Input_Date}
-    Input_Y=${Input_Bperp}
     if [ ! -f "${config}" ];then
-        define_edge_time
+        read_edge_x_time ${Input_Date} 1
+        read_edge_y ${Input_Bperp} f 1 50
         define_io
         echo "Please setup ${config} for input."
         echo
         echo "# Configure for gmt_plot, please visit GMT website for more detail." > ${config}
-        config_default_ts
+        setting_default_xy_plot
         config_gereral
         config_io
         config_psbasemap
@@ -1005,10 +976,10 @@ function plot_baseline(){
         config_title Baseline Plot
         exit 1
     fi
-    setting_config
-    setting_argument
-    setting_XYOffset 3 3
-    setting_output
+    read_config
+    define_argument
+    define_xy_offset 3 3
+    define_output
     Imgs_Count=`wc -l ${Input_Date} | awk '{print $1}'`
     BperpArray=(`cat ${Input_Bperp} | awk '{printf("%d\n",$1)}'`)
     DateArray=(`cat ${Input_Date} | awk '{printf("%d\n",$1)}' | gmt gmtconvert -fT`)
@@ -1019,7 +990,7 @@ function plot_baseline(){
     rm ${Output_File}
 
     echo "DInSAR"
-    setting_output dinsar
+    define_output dinsar
     cp temp.ps ${Output_File}
     Ifgs_Count=`wc -l ${Input_Bperp} | awk '{print $1}'`
     for (( i=0; i<${Ifgs_Count}; i=i+1 ))
@@ -1047,7 +1018,7 @@ function plot_baseline(){
     
     if [ -f "${Input_SBAS}" ];then
         echo "SBAS"
-        setting_output sbas
+        define_output sbas
         cp temp.ps ${Output_File}
         gmt gmtset FORMAT_DATE_IN yyyymmdd
         Ifgs_Count=`wc -l ${Input_SBAS} | awk '{print $1}'`
@@ -1082,11 +1053,10 @@ function plot_baseline(){
 
 function plot_profile(){
     if [ ! -f "${config}" ];then
-        Input_X=${Input_Date}
-        Input_Y=${Input_Bperp}
-        define_edge
+        read_edge_x
+        read_edge_y
         define_io ps_mean_v.xy
-        config_default_ts
+        setting_default_xy_plot
         help_config
         config_gereral
         config_io
@@ -1097,10 +1067,10 @@ function plot_profile(){
         exit 1
     fi
 
-    setting_config
-    setting_argument
-    setting_XYOffset 3 4
-    setting_output
+    read_config
+    define_argument
+    define_xy_offset 3 4
+    define_output
     start=${StartLon}/${StartLat}
     end=${EndLon}/${EndLat}
     echo "Project ${Input_Data} into tmp_${Input_Data}_profile.gmt files"
