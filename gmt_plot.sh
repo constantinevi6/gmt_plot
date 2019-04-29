@@ -314,7 +314,6 @@ function config_map_objects(){
     echo "Compass_offset_X=1  #單位：公分" >> ${config}
     echo "Compass_offset_Y=2  #單位：公分" >> ${config}
     echo "Compass_width=2  #單位：公分" >> ${config}
-    echo "Compass=true" >> ${config}
     echo "## 是否繪製比例尺" >> ${config}
     echo "Scale=true" >> ${config}
     echo "## 設定比例尺樣式" >> ${config}
@@ -954,6 +953,7 @@ function plot_gps_los(){
 
 function plot_image(){
     if [ ! -f "${config}" ];then
+        define_io
         define_edge_geo
         config_default_v
 
