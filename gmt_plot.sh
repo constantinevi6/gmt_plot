@@ -56,14 +56,15 @@ function config_gereral(){
     echo "## MAP_FRAME_TYPE 地圖邊框形式，plain=細框，fancy=斑馬紋粗框" >> ${config}
     echo "## FONT_ANNOT_PRIMARY 坐標軸字體設定" >> ${config}
     echo "gmt_config=\"" >> ${config}
-    if [ "${mode}" == "velocity" ];then
+    if [ "${mode}" == "velocity" ] || [ "${mode}" == "image" ];then
         echo "FORMAT_GEO_MAP=ddd.xxF" >> ${config}
         echo "MAP_FRAME_TYPE=fancy" >> ${config}
         echo "MAP_FRAME_PEN=thicker" >> ${config}
-        echo "MAP_ANNOT_OFFSET=5p" >> ${config}
+        echo "MAP_ANNOT_OFFSET=2p" >> ${config}
         echo "FONT=Times-Roman" >> ${config}
         echo "FONT_LOGO=Times-Roman" >> ${config}
-        echo "FONT_TITLE=24p,Times-Roman" >> ${config}
+        echo "FONT_TITLE=18p,Times-Roman" >> ${config}
+        echo "FONT_LABEL=12p,Times-Roman" >> ${config}
         echo "FONT_ANNOT_PRIMARY=12p,Times-Roman" >> ${config}
     elif [ "${mode}" == "deformation" ];then
         echo "FORMAT_GEO_MAP=ddd.xxF" >> ${config}
@@ -72,7 +73,7 @@ function config_gereral(){
         echo "FONT=Times-Roman" >> ${config}
         echo "FONT_LOGO=Times-Roman" >> ${config}
         echo "FONT_ANNOT_PRIMARY=6p,Times-Roman" >> ${config}
-    elif [ "${mode}" == "timeseries" ];then
+    elif [ "${mode}" == "timeseries" ] || [ "${mode}" == "gpslos" ];then
         echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
         echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
         echo "FORMAT_DATE_MAP=o" >> ${config}
@@ -109,7 +110,7 @@ function config_gereral(){
         echo "FONT_LABEL=18p,Times-Roman" >> ${config}
         echo "MAP_ANNOT_OFFSET_PRIMARY=16p" >> ${config}
         echo "MAP_ANNOT_OFFSET_SECONDARY=20p" >> ${config}
-    elif [ "${mode}" == "gpslos" ];then
+    elif [ "${mode}" == "profile" ];then
         echo "FORMAT_DATE_IN=yyyymmdd" >> ${config}
         echo "FORMAT_DATE_OUT=yyyy-mm-dd" >> ${config}
         echo "FORMAT_DATE_MAP=o" >> ${config}
@@ -185,6 +186,7 @@ function config_basemap_image(){
     echo "Basemap_makecpt_color=" >> ${config}
     echo "## 設定DEM/IFG色帶，格式=[最小值]/[最大值]/[變色間隔]" >> ${config}
     echo "Basemap_makecpt=" >> ${config}
+    echo "" >> ${config}
 }
 
 function config_psxy_PS(){
@@ -235,6 +237,7 @@ function config_psxy_timeseries(){
     echo "PS_Center_Lon=" >> ${config}
     echo "PS_Center_Lat=" >> ${config}
     echo "PS_Radius=10" >> ${config}
+    echo "" >> ${config}
 }
 
 function config_gps_timeseries(){
@@ -246,6 +249,7 @@ function config_gps_timeseries(){
     echo "psxy_HG=blue" >> ${config}
     echo "## 設定起點日期之值為0" >> ${config}
     echo "StartDate=" >> ${config}
+    echo "" >> ${config}
 }
 
 function config_psxy_profile(){
@@ -265,15 +269,27 @@ function config_psxy_profile(){
     echo "StartLat=" >> ${config}
     echo "EndLon=" >> ${config}
     echo "EndLat=" >> ${config}
+    echo "## 設定剖面寬度(單位：公里)" >> ${config}
+    echo "Profile_Width=0.05" >> ${config}
+    echo "" >> ${config}
 }
 
-function config_scale(){
-    echo "# scale setting" >> ${config}
+function config_colorbar(){
+    echo "# colorbar setting" >> ${config}
+    echo "## 圖例樣式" >> ${config}
+    echo "colorbar_position=BC  #R=右 L=左/T=上 B=下" >> ${config}
+    echo "colorbar_width=10" >> ${config}
+    echo "colorbar_high=0.5" >> ${config}
+    echo "colorbar_size_unit=c" >> ${config}
+    echo "colorbar_anchor_point=TC  #R=右 L=左/T=上 B=下" >> ${config}
+    echo "colorbar_direction=h  #h=horizontal v=vertical" >> ${config}
+    echo "colorbar_offset_X=0  #單位：公分" >> ${config}
+    echo "colorbar_offset_Y=1  #單位：公分" >> ${config}
     echo "## 圖例文字說明" >> ${config}
-    echo "scale_Label=\"${scale_Label}\"" >> ${config}
+    echo "colorbar_Label=\"${colorbar_Label}\"" >> ${config}
     echo "## 設定圖例坐標軸刻度間隔" >> ${config}
-    echo "scale_Ba=50" >> ${config}
-    echo "scale_Bf=10" >> ${config}
+    echo "colorbar_scale_Ba=50" >> ${config}
+    echo "colorbar_scale_Bf=10" >> ${config}
     echo "" >> ${config}
 }
 
@@ -312,8 +328,8 @@ function config_map_objects(){
     echo "Scale=true" >> ${config}
     echo "## 設定比例尺樣式" >> ${config}
     echo "Scale_position=RB  #R=右 L=左/T=上 B=下" >> ${config}
-    echo "Scale_offset_X=2  #單位：公分" >> ${config}
-    echo "Scale_offset_Y=2  #單位：公分" >> ${config}
+    echo "Scale_offset_X=1  #單位：公分" >> ${config}
+    echo "Scale_offset_Y=1  #單位：公分" >> ${config}
     echo "Scale_length=10 #單位：公里" >> ${config}
     echo "Scale_align=t  #比例尺標籤位置 r/l/t/b" >> ${config}
     echo "" >> ${config}
@@ -323,7 +339,11 @@ function config_title(){
     argvs=$@
     for argv in ${argvs}
     do
-        Title="${Title} ${argv}"
+        if [ "${Title}" ];then
+            Title="${Title} ${argv}"
+        else
+            Title="${argv}"
+        fi
     done
     echo "# title setting" >> ${config}
     echo "Title=\"${Title}\" " >> ${config}
@@ -337,7 +357,7 @@ function setting_default_map_plot(){
     Map_Bbx=0.2
     Map_Bay=1
     Map_Bby=0.2
-    scale_Label="LOS Velocity (mm/yr)"
+    colorbar_Label="LOS Velocity (mm/yr)"
 }
 
 function setting_default_xy_plot(){
@@ -386,7 +406,6 @@ function define_argument(){
 
     psxy_Size=${psxy_Type}${psxy_Size}
     M_psxy_Size=${M_psxy_Type}${M_psxy_Size}
-    scale_B=a${scale_Ba}f${scale_Bf}
 
     if [ "${psxy_W}" == "-" ];then
         psxy_W=-W${psxy_W}
@@ -422,6 +441,9 @@ function read_edge_y(){
             Edge_Lower=-${Edge_Y}
             Edge_Upper=${Edge_Y}
         fi
+    else
+        Edge_Lower=-${1}
+        Edge_Upper=${1}
     fi
 }
 
@@ -525,8 +547,12 @@ function plot_coastline(){
     gmt pscoast -J -R -B -Df -S140/206/250 -W2/0 -V -K -O >> ${Output_File}
 }
 
-function plot_legend(){
-    gmt psscale -C${1} -J -R -DjBC+w10c/0.5c+jTC+h+o0/1c -B${scale_B}+l"${scale_Label}" -K -O -P -V >> ${Output_File}
+function plot_legend_colorbar(){
+    if [ "${colorbar_direction}" ];then
+        colorbar_direction=+${colorbar_direction}
+    fi
+    colorbar_scale_B=a${colorbar_scale_Ba}f${colorbar_scale_Bf}
+    gmt psscale -C${1} -J -R -Dj${colorbar_position}+w${colorbar_width}/${colorbar_high}${colorbar_size_unit}+j${colorbar_anchor_point}${colorbar_direction}+o${colorbar_offset_X}/${colorbar_offset_Y}c -B${colorbar_scale_B}+l"${colorbar_Label}" -K -O -P -V >> ${Output_File}
 }
 
 function plot_add_layer(){
@@ -534,18 +560,18 @@ function plot_add_layer(){
     do
         LayerFile=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $1}'`
         LayerFileName=`echo ${LayerFile} | sed 's/.*\///g' | sed 's/\..*//g'`
-        LayerIdentify=`echo ${LayerFile} | sed 's/.*\.//g'`
+        LayerFormat=`echo ${LayerFile} | sed 's/.*\.//g'`
         echo Processing ${LayerFileName}
-        if [ "${LayerIdentify}" == "shp" ];then
+        if [ "${LayerFormat}" == "shp" ];then
             ogr2ogr -f gmt ${LayerFileName}.gmt ${LayerFile}
             LayerFile=${LayerFileName}.gmt
             ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
-        elif [ "${LayerIdentify}" == "gmt" ];then
+        elif [ "${LayerFormat}" == "gmt" ];then
             ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
-        elif [ "${LayerIdentify}" == "txt" ];then
+        elif [ "${LayerFormat}" == "txt" ];then
             ShapeTypeIdentify=POINT
         else
-            echo "Not support ${LayerIdentify} format, skip layer plotting."
+            echo "Not support ${LayerFormat} format, skip layer plotting."
         fi
 
         Layer_Size=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $2}'`
@@ -580,6 +606,77 @@ function plot_add_layer(){
             fi
             gmt psxy ${LayerFile} -J -R ${Fill_Color} -W${Layer_Size}p,${Layer_Color} -K -O -V >> ${Output_File}
         fi
+    done
+}
+
+function project_layer(){
+    for Addition_Layer in ${Addition_Layers}
+    do
+        LayerFile=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $1}'`
+        LayerFileName=`echo ${LayerFile} | sed 's/.*\///g' | sed 's/\..*//g'`
+        LayerFormat=`echo ${LayerFile} | sed 's/.*\.//g'`
+        echo Processing ${LayerFileName}
+        if [ "${LayerFormat}" == "shp" ];then
+            ogr2ogr -f gmt ${LayerFileName}.gmt ${LayerFile}
+            LayerFile=${LayerFileName}.gmt
+            ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
+        elif [ "${LayerFormat}" == "gmt" ];then
+            ShapeTypeIdentify=`nl ${LayerFile} | sed -n '1p'`
+        elif [ "${LayerFormat}" == "txt" ];then
+            ShapeTypeIdentify=POINT
+        else
+            echo "Not support ${LayerFormat} format, skip layer plotting."
+        fi
+
+        Layer_Size=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $2}'`
+        Layer_Color=`echo ${Addition_Layer} | awk 'BEGIN {FS = ","} {print $3}'`
+        if [ -z "${Layer_Size}" ];then
+            Layer_Size=${Layer_Point_Size}
+        fi
+        if [ -z "${Layer_Color}" ];then
+            Layer_Color=${Layer_Point_Color}
+        fi
+        LineLayerFile=`wc -l ${LayerFile} | awk '{print $1}'`
+        echo "Project ${LayerFile} into tmp_${LayerFile}_profile.gmt files"
+        for (( i=1; i<=${LineLayerFile}; i=i+1 ))
+        do
+            if [ -z "`cat ${LayerFile} | sed -n ''${i}' p' | grep "#"`" ] && [ -z "`cat ${LayerFile} | sed -n ''${i}' p' | grep ">"`" ];then
+                if [ -z "${StartLon}" ] && [ -z "${StartLat}" ];then
+                echo AAAAAAAA
+                    StartLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
+                    StartLat=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $2}'`
+                elif [ -z "${EndLon}" ] && [ -z "${EndLat}" ];then
+                echo BBBBBBBB
+                    EndLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
+                    EndLat=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $2}'`
+                    start=${StartLon}/${StartLat}
+                    end=${EndLon}/${EndLat}
+                    gmt project ${Input_Data} -C${start} -E${end} -W-${Profile_Width}/${Profile_Width} -Lw -Fxypz -Q >> tmp_${LayerFile}_profile.gmt
+                else
+                echo CCCCCCCC
+                    StartLon=${EndLon}
+                    StartLat=${EndLat}
+                    EndLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
+                    EndLat=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $2}'`
+                    start=${StartLon}/${StartLat}
+                    end=${EndLon}/${EndLat}
+                    LineLast=`wc -l tmp_${LayerFile}_profile.gmt | awk '{print $1}'`
+                    Qdistance=`cat tmp_${LayerFile}_profile.gmt | sed -n ''${LineLast}' p' | awk '{print $3}'`
+                    gmt project ${Input_Data} -C${start} -E${end} -W-${Profile_Width}/${Profile_Width} -Lw -Fxypz -S -Q > tmp_profile.gmt
+                    cat tmp_profile.gmt | awk '{printf("%s\t%s\t%s\t%s\n",$1,$2,($3+'${Qdistance}'),$4)}' >> tmp_${LayerFile}_profile.gmt
+                fi
+            else
+                unset StartLon
+                unset StartLat
+                unset EndLon
+                unset EndLat
+            fi
+        done
+        gmt psxy tmp_${LayerFile}_profile.gmt -i2,3 -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -BW -By${psbasemap_By}+l"LOS Velocity (mm/year)" -S${Layer_Size} -G${Layer_Color} -O -K >> ${Output_File}
+        unset StartLon
+        unset StartLat
+        unset EndLon
+        unset EndLat
     done
 }
 
@@ -620,7 +717,7 @@ function plot_velocity(){
     if [ ! -f "${config}" ];then
         define_io ps_mean_v.xy
         read_edge_x ${Input_LonLat} f 1 0.1
-        read_edge_y ${Input_LonLat} f 1 0.1
+        read_edge_y ${Input_LonLat} f 2 0.1
         read_edge_cpt
         setting_default_map_plot
 
@@ -630,7 +727,7 @@ function plot_velocity(){
         config_psbasemap
         config_basemap_image
         config_psxy_PS
-        config_scale
+        config_colorbar
         config_addition_layer
         config_map_objects
         config_title PS Velocity Plot
@@ -651,13 +748,13 @@ function plot_velocity(){
     else
         echo Skipping plot image.
     fi
-    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "front" ];then
+    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "back" ];then
         plot_add_layer
     fi
 
     plot_ps
 
-    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "back" ];then
+    if [ "${Addition_Layers}" ] && [ "${Addition_Layers_Position}" == "front" ];then
         plot_add_layer
     fi
 
@@ -671,7 +768,7 @@ function plot_velocity(){
         gmt psbasemap -R -J -O -K -Lj${Scale_position}+c${Edge_Lower}+w${Scale_length}k+f+o${Scale_offset_X}c/${Scale_offset_Y}c+u+a${Scale_align} -F+gwhite@50 >> ${Output_File}
     fi
     
-    plot_legend ps.cpt
+    plot_legend_colorbar ps.cpt
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
     convert_fig
@@ -688,7 +785,7 @@ function plot_deformation(){
         config_psbasemap
         config_basemap_image
         config_psxy_PS
-        config_scale
+        config_colorbar
         config_title PS Deformation Plot
         exit 1
     fi
@@ -698,9 +795,9 @@ function plot_deformation(){
 
 function plot_timeseries(){
     if [ ! -f "${config}" ];then
-        define_io ps_u-dmo_r0.*.xy
+        define_io ps_u-dmo_r0.\*.xy
         read_edge_x_time ${Input_Date} 1
-        read_edge_y
+        read_edge_y 100
         setting_default_xy_plot
         help_config
         config_gereral
@@ -830,7 +927,7 @@ function plot_gps(){
     if [ ! -f "${config}" ];then
         setting_default_xy_plot
         help_config
-        if [ -n "${1}" ];then
+        if [ "${1}" ];then
             define_io ${1}
             read_edge_time_GPS
             read_edge_y ${1} f 7 50 fix
@@ -926,7 +1023,7 @@ function plot_image(){
     if [ ! -f "${config}" ];then
         define_io
         read_edge_x ${Input_LonLat} f 1 0.1
-        read_edge_y ${Input_LonLat} f 1 0.1
+        read_edge_y ${Input_LonLat} f 2 0.1
         setting_default_map_plot
 
         help_config
@@ -1062,6 +1159,7 @@ function plot_profile(){
         config_io
         config_psbasemap
         config_basemap_image
+        config_addition_layer
         config_psxy_profile
         config_title LOS Velocity Profile
         exit 1
@@ -1071,32 +1169,48 @@ function plot_profile(){
     define_argument
     define_xy_offset 3 4
     define_output
-    start=${StartLon}/${StartLat}
-    end=${EndLon}/${EndLat}
-    echo "Project ${Input_Data} into tmp_${Input_Data}_profile.gmt files"
-    gmt project ${Input_Data} -C${start} -E${end} -W-0.01/0.01 -Lw -Fxypz -Q > tmp_${Input_Data}_profile.gmt
-    echo "Project DEM into tmp_topo_profile.gmt"
-    gmt project -C${start} -E${end} -G0.005 -Q > tmp_profile.gmt
-    if [ `gmt math -Q ${StartLon} ${EndLon} GT =` -eq 1 ];then
-        win_start_x=${EndLon}
-        win_end_x=${StartLon}
-    else
-        win_start_x=${StartLon}
-        win_end_x=${EndLon}
+    if [ "${StartLon}" ] && [ "${StartLat}" ] && [ "${EndLon}" ] && [ "${EndLat}" ];then
+        echo "${StartLon} ${StartLat}" > tmp_profile.txt
+        echo "${EndLon} ${EndLat}" >> tmp_profile.txt
+        unset StartLon
+        unset StartLat
+        unset EndLon
+        unset EndLat
     fi
-    if [ `gmt math -Q ${StartLat} ${EndLat} GT =` -eq 1 ];then
-        win_start_y=${EndLat}
-        win_end_y=${StartLat}
+    if [ -z "${Addition_Layers}" ] && [ -f "tmp_profile.txt" ];then
+        Addition_Layers=tmp_profile.txt
+    elif [ -z "${Addition_Layers}" ] && [ ! -f "tmp_profile.txt" ];then
+        echo "No input profile."
+        exit 1
     else
-        win_start_y=${StartLat}
-        win_end_y=${EndLat}
+        Addition_Layers="${Addition_Layers} tmp_profile.txt"
     fi
-    crop_image ${win_start_x} ${win_end_y} ${win_end_x} ${win_start_y}
-    gmt grdtrack tmp_profile.gmt -G${Basemap_Output} > tmp_topo_profile.gmt
-    
+
     gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BSen+t"${Title}" -Bx${psbasemap_Bx}+l"Distence (m)" ${X} ${Y} -K > ${Output_File}
-    gmt psxy tmp_topo_profile.gmt -i2,3 -R -J -BE -By${psbasemap_By}+l"Elevation (m)" -O -K >> ${Output_File}
-    gmt psxy tmp_${Input_Data}_profile.gmt -i2,3 -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -BW -By${psbasemap_By}+l"LOS Velocity (mm/year)" -S${psxy_Size_Mean} -G${psxy_G} -O -K >> ${Output_File}
+    project_layer
+    
+    # echo "Project DEM into tmp_topo_profile.gmt"
+    # gmt project -C${start} -E${end} -G0.005 -Q > tmp_profile.gmt
+    # if [ `gmt math -Q ${StartLon} ${EndLon} GT =` -eq 1 ];then
+    #     win_start_x=${EndLon}
+    #     win_end_x=${StartLon}
+    # else
+    #     win_start_x=${StartLon}
+    #     win_end_x=${EndLon}
+    # fi
+    # if [ `gmt math -Q ${StartLat} ${EndLat} GT =` -eq 1 ];then
+    #     win_start_y=${EndLat}
+    #     win_end_y=${StartLat}
+    # else
+    #     win_start_y=${StartLat}
+    #     win_end_y=${EndLat}
+    # fi
+    # crop_image ${win_start_x} ${win_end_y} ${win_end_x} ${win_start_y}
+    # gmt grdtrack tmp_profile.gmt -G${Basemap_Output} > tmp_topo_profile.gmt
+    
+    
+    # gmt psxy tmp_topo_profile.gmt -i2,3 -R -J -BE -By${psbasemap_By}+l"Elevation (km)" -O -K >> ${Output_File}
+    
 
     # 封檔
     gmt psxy -R -J -T -O >> ${Output_File}
@@ -1116,6 +1230,10 @@ else
     mode=${1}
 fi
 Input_config=${2}
+
+if [ -f "gmt.conf" ];then
+    rm gmt.conf
+fi
 
 define_configure
 
