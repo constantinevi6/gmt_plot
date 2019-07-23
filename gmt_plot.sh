@@ -642,18 +642,15 @@ function project_layer(){
         do
             if [ -z "`cat ${LayerFile} | sed -n ''${i}' p' | grep "#"`" ] && [ -z "`cat ${LayerFile} | sed -n ''${i}' p' | grep ">"`" ];then
                 if [ -z "${StartLon}" ] && [ -z "${StartLat}" ];then
-                echo AAAAAAAA
                     StartLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
                     StartLat=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $2}'`
                 elif [ -z "${EndLon}" ] && [ -z "${EndLat}" ];then
-                echo BBBBBBBB
                     EndLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
                     EndLat=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $2}'`
                     start=${StartLon}/${StartLat}
                     end=${EndLon}/${EndLat}
                     gmt project ${Input_Data} -C${start} -E${end} -W-${Profile_Width}/${Profile_Width} -Lw -Fxypz -Q >> tmp_${LayerFile}_profile.gmt
                 else
-                echo CCCCCCCC
                     StartLon=${EndLon}
                     StartLat=${EndLat}
                     EndLon=`cat ${LayerFile} | sed -n ''${i}' p' | awk '{print $1}'`
