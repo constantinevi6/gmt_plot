@@ -893,7 +893,7 @@ function plot_timeseries(){
             echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
             for (( j=0; j<${Date_Count}; j=j+1 ))
             do
-                data=`grep ${Lon}.*${Lat} ${Input_FilesArray[${j}]} | awk '{printf("%.8f\n",$3)}'`
+                data=`grep .${Lon}.*${Lat} ${Input_FilesArray[${j}]} | awk '{printf("%.8f\n",$3)}'`
                 line=${line}\ ${data}
                 echo ${DateArray[${j}]} ${data} ${i} >> tmp_TS.txt
             done
