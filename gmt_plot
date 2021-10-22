@@ -494,9 +494,9 @@ function define_edge_time_GPS(){
 }
 
 function define_edge_time_GPS_es(){
-    gmt gmtset FORMAT_DATE_IN yyyymmdd FORMAT_DATE_OUT yyyymmdd
-    First_YearDate=`echo ${Edge_Left} | gmt info -fT -I1 -C`
-    Last_YearDate=`echo ${Edge_Right} | gmt info -fT -I1 -C`
+    gmt gmtset FORMAT_DATE_IN yyyy-mm-dd FORMAT_DATE_OUT yyyymmdd
+    First_YearDate=`echo ${Edge_Left} | gmt info -fT -I1 -C | cut -f1`
+    Last_YearDate=`echo ${Edge_Right} | gmt info -fT -I1 -C | cut -f2`
 }
 
 function read_edge_cpt(){
@@ -721,7 +721,7 @@ function convert_fig(){
     psconvert_T=-T${psconvert_T}
 
     if [ "${Output_Figure_Adjust}" == "true" ];then
-        psconvert_A=-A
+        psconvert_A=-A0c/1c/0.5c/0c
     fi
     gmt psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
 }
@@ -998,8 +998,8 @@ function plot_sigma0_timeseries(){
             Crop_Identify=`gmt math -Q ${Distance} 1 GE =`
         done
         findLonLat=`cat ${Input_LonLat} | awk '$1>'"${F_Lon}"' && $1<'"${L_Lon}"' && $2<'"${U_Lat}"' && $2>'"${L_Lat}"`
-        echo $findLonLat
-        exit
+        findline=`grep -n "$findLonLat" ${Input_LonLat} | awk -F: '{print $1}'`
+        sed -n ${findline}p ps_ij.txt | awk '{printf("%d %d\n",$2,$1)}' >> tmp_psij.txt
     done
     
     IMGFiles=`ls ${Input_Data}`
@@ -1011,7 +1011,7 @@ function plot_sigma0_timeseries(){
     done
     echo "x y ${Dates}" > profiles.txt
 
-    gmt grdtrack ${Input_LonLat} -G+tmp_imglist.txt >> profiles.txt
+    gmt grdtrack tmp_psij.txt -G+ltmp_imglist.txt >> profiles.txt
 }
 
 function plot_gps(){
@@ -1087,19 +1087,16 @@ function plot_gps_es(){
     GPS_Lat=`sed -n 1p tmp_${Input_Data} | awk '{printf("%.4f\n",$2)}'`
     define_output ${GPS_Name}
     define_edge_time_GPS_es
-
     # 繪製原始資料
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd PS_MEDIA A3 PS_PAGE_ORIENTATION portrait
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o+l"Time" -Bpya${Map_Bay}f${Map_Bby}+l"Height (mm)" -BWSen -X1.5i -Y1.5i > ${Output_File}
-    
     gmt gmtset FORMAT_DATE_IN yyyymmdd
-    awk '{print $1, $7}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
-
+    awk '{print $1, $7*1000}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen -Y5i >> ${Output_File}
-    awk '{print $1, $6}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LatG} -K -O -V >> ${Output_File}
+    awk '{print $1, $6*1000}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LatG} -K -O -V >> ${Output_File}
 
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Latitude (mm)" -BWSen+t"${Title}" -Y5i >> ${Output_File}
-    awk '{print $1, $5}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LonG} -K -O -V >> ${Output_File}
+    awk '{print $1, $5*1000}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_LonG} -K -O -V >> ${Output_File}
 
     echo "75 96 GPS Station : ${GPS_Name}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${Output_File}
     echo "75 90 Lat : ${GPS_Lon}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${Output_File}
@@ -1469,7 +1466,7 @@ elif [ "${mode}" == "ts" ];then
 elif [ "${mode}" == "s0ts" ];then
     mode=S0timeseries
     if [ -f "${3}" ];then
-        LonLat_list=${3}
+        LonLat_list=`cat ${3}`
     fi
     plot_sigma0_timeseries
 elif [ "${mode}" == "bl" ];then
