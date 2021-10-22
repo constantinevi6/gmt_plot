@@ -495,8 +495,10 @@ function define_edge_time_GPS(){
 
 function define_edge_time_GPS_es(){
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd FORMAT_DATE_OUT yyyymmdd
-    First_YearDate=`echo ${Edge_Left} | gmt info -fT -I1 -C | cut -f1`
-    Last_YearDate=`echo ${Edge_Right} | gmt info -fT -I1 -C | cut -f2`
+    First_YearDate=`echo ${Edge_Left} | gmt info -fT -I1 -C`
+    echo $First_YearDate
+    Last_YearDate=`echo ${Edge_Right} | gmt info -fT -I1 -C`
+    echo $Last_YearDate
 }
 
 function read_edge_cpt(){
@@ -551,7 +553,7 @@ function plot_basemap_image(){
         gmt makecpt -C${Basemap_makecpt_color} -T${Basemap_makecpt} -Z > image_cpt.cpt
         gmt grdimage ${Basemap_Output} -Cimage_cpt.cpt -Q -J -R -K -O -P -V >> ${Output_File}
     elif [ "${Basemap_Type}" == "IMG" ];then
-        gmt grdimage ${Basemap_Output}+b0 ${Basemap_Output}+b1 ${Basemap_Output}+b2 -J -R -E300 -K -O -P -V >> ${Output_File}
+        gmt grdimage ${Basemap_Output} -J -R -E300 -K -O -P -V >> ${Output_File}
     fi
 }
 
@@ -1087,9 +1089,11 @@ function plot_gps_es(){
     GPS_Lat=`sed -n 1p tmp_${Input_Data} | awk '{printf("%.4f\n",$2)}'`
     define_output ${GPS_Name}
     define_edge_time_GPS_es
+
     # 繪製原始資料
     gmt gmtset FORMAT_DATE_IN yyyy-mm-dd PS_MEDIA A3 PS_PAGE_ORIENTATION portrait
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J${psbasemap_J} -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o+l"Time" -Bpya${Map_Bay}f${Map_Bby}+l"Height (mm)" -BWSen -X1.5i -Y1.5i > ${Output_File}
+    
     gmt gmtset FORMAT_DATE_IN yyyymmdd
     awk '{print $1, $7*1000}' tmp_${Input_Data} | gmt psxy -J -R${First_YearDate}/${Last_YearDate}/${Edge_Lower}/${Edge_Upper} -S${psxy_Size} -G${psxy_HG} -K -O -V >> ${Output_File}
     gmt psbasemap -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -O -K -Bsx${Map_Bax}Y -Bpxa0Of${Map_Bbx}o -Bpya${Map_Bay}f${Map_Bby}+l"Longitude (mm)" -BWSen -Y5i >> ${Output_File}
