@@ -723,7 +723,7 @@ function convert_fig(){
     psconvert_T=-T${psconvert_T}
 
     if [ "${Output_Figure_Adjust}" == "true" ];then
-        psconvert_A=-A0c/1c/0.5c/0c
+        psconvert_A=-A
     fi
     gmt psconvert ${psconvert_T} ${psconvert_A} -P ${Output_File}
 }
@@ -899,7 +899,7 @@ function plot_timeseries(){
         Identify=`gmt math -Q ${PS_Radius} ${Distance} GE =`
         if [ "${Identify}" -eq "1" ];then
             echo "> -Z"${i} >> tmp_TS.txt
-            echo ${Lon} ${Lat} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}.txt
+            echo ${Lon} ${Lat} >> ${Output_File}_content.txt
             for (( j=0; j<${Date_Count}; j=j+1 ))
             do
                 data=`grep .${Lon}.*${Lat} ${Input_FilesArray[${j}]} | awk '{printf("%.8f\n",$3)}'`
@@ -920,11 +920,15 @@ function plot_timeseries(){
     StdArray=(`gmt math -Ca -S tmp_TS_Data.txt STD =`)
     echo "> -Z0" >> tmp_TS_Mean_Error.txt
     echo "Drawing mean time series...."
+    if [ -f "${Output_File}_data.txt" ]
+        rm ${Output_File}_data.txt
+    fi
+
     for (( j=0; j<${Date_Count}; j=j+1 ))
     do
         echo ${DateArray[${j}]} ${MeanArray[${j}]} ${StdArray[${j}]} >> tmp_TS_Mean_Error.txt
         echo ${DateMJDArray[${j}]} ${MeanArray[${j}]} >> tmp_TS_Mean_MJD.txt
-        echo ${DateArray[${j}]} ${MeanArray[${j}]} >> ${Output_File}_${PS_Center_Lon}_${PS_Center_Lat}_data.txt
+        echo ${DateArray[${j}]} ${MeanArray[${j}]} >> ${Output_File}_data.txt
     done
     gmt regress tmp_TS_Mean_MJD.txt -Fxmc -C95 > tmp_regress.txt
     if [ "${Plot_Mean_PS_W}" == "true" ];then
@@ -943,6 +947,43 @@ function plot_timeseries(){
 
     #刪除暫存檔
     rm tmp_*
+}
+
+function plot_timeseries_from_input(){
+    if [ ! -f "${config}" ];then
+        define_io fix_\*.xy
+        read_edge_x_time ${Input_Date} 1
+        read_edge_y 100
+        setting_default_xy_plot
+        help_config
+        config_gereral
+        config_io
+        config_psbasemap
+        config_psxy_timeseries
+        config_title PS Time Series Plot
+        exit 1
+    fi
+
+    read_config
+    define_argument
+    define_xy_offset 3 4
+
+    #載入座標資料
+    echo Load data.
+    
+    files=`ls ${Input_Data}`
+    for file in ${files}
+    do
+        gmt gmtset FORMAT_DATE_IN yyyy-mm-dd
+        gmt psbasemap -J${psbasemap_J} -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -BWSen+t"${Title}" -Bsx${Map_Bax}Y -Bpxa${Map_Bbx}Of1o+l"Time" -By${psbasemap_By}+l"LOS Displacement (mm)" ${X} ${Y} -K -V > ${file}.ps
+        gmt psxy -R${Edge_Left}/${Edge_Right}/${Edge_Lower}/${Edge_Upper} -J -S${psxy_Size_Mean} -G${psxy_G} ${errorbar} -O -K ${file} >> ${file}.ps
+        echo "75 98 Central Lon : ${PS_Center_Lon}" | gmt pstext -R0/100/0/100 -J -F+f16p+jTL -O -K >> ${file}.ps
+        echo "75 92 Central Lat : ${PS_Center_Lat}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${file}.ps
+        echo "75 86 Selected PSs : ${PS_Select}" | gmt pstext -R -J -F+f16p+jTL -O -K >> ${file}.ps
+        # 封檔
+        gmt psxy -R -J -T -O >> ${file}.ps
+        gmt psconvert -TG -A -P ${file}.ps
+    done
 }
 
 function plot_sigma0_timeseries(){
@@ -1467,6 +1508,10 @@ elif [ "${mode}" == "ts" ];then
         echo "Start to plot PSI time series...."
         plot_timeseries
     fi
+elif [ "${mode}" == "tsff" ];then
+    mode=timeseries
+    echo "Start to plot PSI time series from input file...."
+    plot_timeseries_from_input
 elif [ "${mode}" == "s0ts" ];then
     mode=S0timeseries
     if [ -f "${3}" ];then
