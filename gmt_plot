@@ -920,7 +920,7 @@ function plot_timeseries(){
     StdArray=(`gmt math -Ca -S tmp_TS_Data.txt STD =`)
     echo "> -Z0" >> tmp_TS_Mean_Error.txt
     echo "Drawing mean time series...."
-    if [ -f "${Output_File}_data.txt" ]
+    if [ -f "${Output_File}_data.txt" ];then
         rm ${Output_File}_data.txt
     fi
 
