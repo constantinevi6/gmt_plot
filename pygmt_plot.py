@@ -4,17 +4,18 @@ import pygmt
 import laspy
 import math
 import numpy as np
-from pathlib import Path
-import matplotlib.pyplot as plt
-#from obspy import UTCDateTime
+import copy
 import datetime
 import yaml
 import sys
 import os
+import multiprocessing
+#import matplotlib.pyplot as plt
 from collections import OrderedDict
 from osgeo import gdal
 from osgeo import osr
-import copy
+from pathlib import Path
+#from obspy import UTCDateTime
 
 def represent_dictionary_order(self, dict_data):
     return self.represent_mapping('tag:yaml.org,2002:map', dict_data.items())
@@ -216,7 +217,9 @@ def config_PSTS(config):
     newMonth = (ListDate[len(ListDate) - 1].month -1 + 1) % 12 + 1
     Range_X_Max = Range_X_Max.replace(month=newMonth, day=1)
     NLayer = 0
-    config_general(config, "GMTPlot_PSTS", "PNG", True, Range_X_Min, Range_X_Max, -Range_Y, Range_Y, "X", 18, 8, "c", "plain")
+    config_general(config, "GMTPlot_PSTS", "PNG", True, Range_X_Min, Range_X_Max, -Range_Y, Range_Y, "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
+    NLayer += 1
+    config_xy(NLayer, config, False, DataInput,True, 0.1, "c", "", "", "categorical")
     NLayer += 1
     config_xy(NLayer, config, True, DataInput,True, 0.2, "c", "", "black")
 
@@ -322,8 +325,7 @@ def plot_Frame(fig, Layer):
     Byg = Layer['Map Grid Y']
     X_Offset = Layer['Map X Offset']
     Y_Offset = Layer['Map Y Offset']
-
-    print("Plotting Frame....")
+    
     Frame = [Frame]
     if Bax != 0:
         Bax=str(Bax)
@@ -618,6 +620,10 @@ def get_psts(config, PS):
     FileOutputData.close()
     return True
 
+def plot_psts(config, PS):
+    if get_psts(config, PS):
+        plot(config)
+
 def plot(config):
     for nPlot in config:
         Plot = config[nPlot]
@@ -664,17 +670,19 @@ else:
 
 if sys.argv[1] == "psts":
     if len(sys.argv) == 5:
-        get_psts(config, np.array([float(sys.argv[3]), float(sys.argv[4]), 0]))
-        plot(config)
+        List_PS = np.array([(float(sys.argv[3]), float(sys.argv[4]))])
         # if isinstance(sys.argv[3],float) & isinstance(sys.argv[4],float):
-            
+        
     elif Path(sys.argv[3]).is_file:
         List_PS = np.genfromtxt(Path(sys.argv[3]), delimiter=',')
-        for PS in List_PS:
+    ListTask = []
+    for PS in List_PS:
+        if len(PS) == 2:
             PS = np.append(PS,0.0)
-            configPS = copy.deepcopy(config)
-            if get_psts(configPS, PS):
-                plot(configPS)
-        exit(0)
+        configPS = copy.deepcopy(config)
+        ListTask.append(multiprocessing.Process(target=plot_psts, args=(configPS,PS)))
+    if __name__=='__main__':
+        for Task in ListTask:
+            Task.start()
 else:
     plot(config)
