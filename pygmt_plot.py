@@ -10,6 +10,7 @@ import yaml
 import sys
 import os
 import multiprocessing
+import chardet
 #import matplotlib.pyplot as plt
 from collections import OrderedDict
 from osgeo import gdal
@@ -17,11 +18,19 @@ from osgeo import osr
 from pathlib import Path
 #from obspy import UTCDateTime
 
+Version = "2.0.1"
+
 def represent_dictionary_order(self, dict_data):
     return self.represent_mapping('tag:yaml.org,2002:map', dict_data.items())
 
 def setup_yaml():
     yaml.add_representer(OrderedDict, represent_dictionary_order)   
+
+def detectEncode(DataInput):
+    rawdata = open(DataInput, "rb").read()
+    result = chardet.detect(rawdata)
+    Encode = result['encoding']
+    return Encode
 
 def read_laz(DataInput):
     if not DataInput.exists():
@@ -56,8 +65,6 @@ def m2lon(P, Radius):
     return abs(dLon)
 
 def help_info():
-    print("")
-    print("pyGMT plot script by Constantine VI.")
     print("")
     print("Support mode:")
     print("    map:  just a simple map.")
@@ -266,6 +273,7 @@ def config_load(Type="", Path_config=""):
         config_generate(config, Path_config, Type)
         exit(0)
     else:
+        print(f"Read config from file {Path_config}.")
         with open(Path_config, 'r') as f:
             config = yaml.full_load(f)
     return config
@@ -478,17 +486,26 @@ def plot_xy(fig,  Layer):
     Series = Layer['CPT Range']
     if (Path(Input).suffix == ".las") | (Path(Input).suffix == ".laz"):
         dataset = read_laz(Path(Input))
-        X = dataset[0]
-        Y = dataset[1]
-        Z = dataset[2]
-    elif TS:
-        X = np.loadtxt(Input,dtype="datetime64",usecols=0)
-        Y = np.loadtxt(Input,dtype="float",usecols=1)
+    elif Path(Input).suffix == ".csv":
+        Delimier = ","
+        Encode = detectEncode(Path(Input))
+        dataset = np.loadtxt(Input,dtype="str",delimiter=Delimier,encoding=Encode)
+    else:
+        Delimier = None
+        Encode = None
+        dataset = np.loadtxt(Input,dtype="str",delimiter=Delimier,encoding=Encode)
+
+    dataset = dataset.transpose()
+    if TS:
+        X = np.array(dataset[0],dtype="datetime64")
+    else:
+        X = np.array(dataset[0],dtype="float")
+
+    Y = np.loadtxt(dataset[1],dtype="float")
+
+    if len(dataset) < 3:
         Z = np.zeros(len(X))
     else:
-        dataset = np.loadtxt(Path(Input))
-        X = dataset[0]
-        Y = dataset[1]
         Z = dataset[2]
 
     if Size == "Data":
@@ -624,7 +641,7 @@ def plot_psts(config, PS):
     if get_psts(config, PS):
         plot(config)
 
-def plot(config):
+def plot(config, Input = ""):
     for nPlot in config:
         Plot = config[nPlot]
         fig = pygmt.Figure()
@@ -639,6 +656,12 @@ def plot(config):
             elif Layer['Layer'] == "psxy":
                 if not Layer['Plot']:
                     continue
+                if Input:
+                    if Path(Input).is_file:
+                        Layer["Data Path"] = Path(Input)
+                        Plot["IO"]["Ouput Name"] = Path(Input).stem
+                    else:
+                        return 1
                 plot_xy(fig, Layer)
             elif Layer['Layer'] == "psscale":
                 if not Layer['Plot']:
@@ -650,6 +673,7 @@ def plot(config):
         fig.savefig(f"{Plot['IO']['Ouput Name']}.png",transparent=True)
 
 # Main
+print(f"pyGMT plot Version: {Version} by Constantine VI.")
 Type = ["help","map", "ts", "psv", "psd", "psts", "s0", "bl", "gps", "gpsv", "gpsl", "custom"]
 config = {}
 setup_yaml()
@@ -670,10 +694,12 @@ else:
 
 if sys.argv[1] == "psts":
     if len(sys.argv) == 5:
+        print("PS time series plot for single point.")
         List_PS = np.array([(float(sys.argv[3]), float(sys.argv[4]))])
         # if isinstance(sys.argv[3],float) & isinstance(sys.argv[4],float):
         
     elif Path(sys.argv[3]).is_file:
+        print("PS time series plot for selected points.")
         List_PS = np.genfromtxt(Path(sys.argv[3]), delimiter=',')
     ListTask = []
     for PS in List_PS:
@@ -685,4 +711,11 @@ if sys.argv[1] == "psts":
         for Task in ListTask:
             Task.start()
 else:
-    plot(config)
+    if len(sys.argv) > 3:
+        Input = sys.argv[3:len(sys.argv)]
+    else:
+        Input = [""]
+        
+    for InputFile in Input:
+        print(f"Plotting figure for {InputFile}")
+        plot(config, InputFile)

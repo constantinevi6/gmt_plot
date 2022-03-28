@@ -16,8 +16,10 @@ Requrement:
 
 - [pyyaml](https://pyyaml.org): PyYAML is a full-featured YAML framework for the Python programming language.
 
+- [chardet](https://pypi.org/project/chardet/):Universal encoding detector for Python 2 and 3
+
 簡易安裝方式：
-conda install -c conda-forge matplotlib pyyaml pygmt
+conda install -c conda-forge matplotlib pyyaml pygmt chardet
 
 pip install laspy[lazrs,laszip]
 
@@ -28,6 +30,9 @@ g++ -std=c++11 -o lonlat2m lonlat2m.cpp -I/usr/include/boost169
 boost版本請修改至安裝的版本。
 
 Version history:
+
+- Release Ver. 2.0.1
+    - Feature: 支援輸入獨立檔案之時間序列繪圖。
 
 - Release Ver. 2.0.0
     - Feature: 新增pygmt版本，支援速度場、時間序列繪圖。
