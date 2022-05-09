@@ -171,6 +171,31 @@ def config_compass(LayerID, config, Plot=False, Position="LT", Position_Offset_X
         "Y Offset": float(Y_Offset),
         }
 
+def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y=None, Position="TL", Position_Offset_X=0, Position_Offset_Y=0, Font="Times-Roman", FontSize="16p", FontColor="black", Justify="BL", Angle=0, Clearance="", Fill=None, Pen=None, NoClip=False, Transparency=0, Wrap=None, X_Offset=0, Y_Offset=0):
+    config["Layer"+str(LayerID)] = {
+        "Layer": "text",
+        "Plot": Plot,
+        "Text": Text,
+        "Position X": Position_X,
+        "Position Y": Position_Y,
+        "Position": Position,
+        "Position X Offset": Position_Offset_X,
+        "Position Y Offset": Position_Offset_Y,
+        "Font": Font,
+        "Font Size": FontSize,
+        "Font Color": FontColor,
+        "Justify": Justify,
+        "Angle": Angle,
+        "Clearance": Clearance,
+        "Fill": Fill,
+        "Pen": Pen,
+        "NoClip": NoClip,
+        "Transparency": Transparency,
+        "Wrap": Wrap,
+        "X Offset": float(X_Offset),
+        "Y Offset": float(Y_Offset),
+        }
+
 def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0, Position_Offset_Y=0, Length=10, Unit="e", Align="t", X_Offset=1, Y_Offset=1):
     config["Layer"+str(LayerID)] = {
         "Layer": "scale",
@@ -227,9 +252,15 @@ def config_PSTS(config):
     NLayer = 0
     config_general(config, "GMTPlot_PSTS", "PNG", True, Range_X_Min, Range_X_Max, -Range_Y, Range_Y, "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
     NLayer += 1
-    config_xy(NLayer, config, False, DataInput,True, 0.1, "c", "", "", "categorical")
+    config_xy(NLayer, config, False, DataInput,True, 0.1, "c", "", "", "categorical", [0])
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput,True, 0.2, "c", "", "black")
+    config_xy(NLayer, config, True, DataInput,True, 0.16, "c", "", "black", "", [0])
+    NLayer += 1
+    config_text(NLayer, config, True, "Lontitude:   ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
+    NLayer += 1
+    config_text(NLayer, config, True, "Latitude:    ", None, None, "TL", 0.5, -1, "Times-Roman", "10p", "black", "BL", 0)
+    NLayer += 1
+    config_text(NLayer, config, True, "Picked PSs:  ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
 
 def config_generate(config, Path_config, Type):
     Plot = {}
@@ -593,6 +624,37 @@ def plot_psscale(
         box      = '+gwhite@30+r'
     )
 
+def plot_text(fig, Layer):
+    Text = Layer['Text']
+    Position_X = Layer['Position X']
+    Position_Y = Layer['Position Y']
+    Position = Layer['Position']
+    Position_Offset_X = Layer['Position X Offset']
+    Position_Offset_Y = Layer['Position Y Offset']
+    Font = Layer['Font']
+    FontSize = Layer['Font Size']
+    FontColor = Layer['Font Color']
+    Justify= Layer['Justify']
+    Angle= Layer['Angle']
+    Clearance= Layer['Clearance']
+    Fill= Layer['Fill']
+    Pen= Layer['Pen']
+    NoClip= Layer['NoClip']
+    Transparency= Layer['Transparency']
+    Wrap= Layer['Wrap']
+    Offset_X= Layer['X Offset']
+    Offset_Y= Layer['Y Offset']
+
+    if (Position_X != None) and (Position_Y != None):
+        Position = None
+        Position_Offset_X = 0
+        Position_Offset_Y = 0
+    Offset = str(Position_Offset_X) + "c/" + str(Position_Offset_Y) + "c"
+    Font = FontSize + "," + Font + "," + FontColor
+    if len(Clearance) == 0:
+        Clearance = None
+    fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap,xshift=Offset_X,yshift=Offset_Y)
+
 def get_psts(config, PS):
     print(f"Plotting PS at {PS[0]}, {PS[1]}")
     Lon=PS[0]
@@ -609,7 +671,7 @@ def get_psts(config, PS):
         for nLayer in Plot:
             Layer = Plot[nLayer]
             if Layer['Layer'] == "IO":
-                Layer['Ouput Name'] = Layer['Ouput Name'] + "_" + str(Lon) + "_" + str(Lat)
+                Layer['Ouput Name'] = Layer['Ouput Name'] + "_" + str(format(Lon, '.5f')) + "_" + str(format(Lat, '.6f'))
             if Layer['Layer'] == "psxy":
                 DataInput = Path(Layer['Data Path'])
                 for itData in os.listdir(DataInput):
@@ -618,7 +680,12 @@ def get_psts(config, PS):
                         ListData.append(pathData)
                 Layer['Data Path'] = Plot['IO']['Ouput Name'] + ".txt"
                 PS_TXT = Plot['IO']['Ouput Name'] + ".txt"
-
+            if Layer['Layer'] == "text":
+                if Layer['Text'].find("Lontitude") == 0:
+                    Layer['Text'] = "Lontitude:   "+ str(format(Lon, '.5f'))
+                if Layer['Text'].find("Latitude") == 0:
+                    Layer['Text'] = "Latitude:      "+ str(format(Lat, '.6f'))
+    
     ListData.sort()
     PS_Pick = []
     dataset = read_laz(ListData[0])
@@ -627,7 +694,15 @@ def get_psts(config, PS):
     if not any(PS_Pick):
         print(f"Can't find PS within {Range} meter(s) at {PS[0]}, {PS[1]}")
         return False
-    
+
+    for nPlot in config:
+        Plot = config[nPlot]
+        for nLayer in Plot:
+            Layer = Plot[nLayer]
+            if Layer['Layer'] == "text":
+                if Layer['Text'].find("Picked") == 0:
+                    Layer['Text'] = "Picked PSs: " + str(np.count_nonzero(PS_Pick))
+
     FileOutputData = open(PS_TXT, 'w')
     for itData in ListData:
         dataset = read_laz(itData)
@@ -641,6 +716,9 @@ def get_psts(config, PS):
 
 def plot_psts(config, PS):
     if get_psts(config, PS):
+        pygmt.config(
+            FONT="Times-Roman",
+            MAP_GRID_PEN_PRIMARY="thinnest,-")
         plot(config)
 
 def plot(config, Input = ""):
@@ -669,6 +747,9 @@ def plot(config, Input = ""):
                 if not Layer['Plot']:
                     continue
                 plot_psscale(fig, Plot[Layer['Link']],Layer['Position'],Layer['Position X Offset'],Layer['Position Y Offset'],Layer['Width'],Layer['Hight'],Layer['Unit'],Layer['Anchor'],Layer['Direction'],Layer['Label'],Layer['Ba'],Layer['Bf'])
+            elif Layer['Layer'] == "text":
+                plot_text(fig, Layer)
+        
         plot_Frame(fig, Plot['basemap'])
         
         # fig.show()
