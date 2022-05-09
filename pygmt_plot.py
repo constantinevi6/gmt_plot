@@ -11,6 +11,7 @@ import sys
 import os
 import multiprocessing
 import chardet
+import time
 #import matplotlib.pyplot as plt
 from collections import OrderedDict
 from osgeo import gdal
@@ -490,23 +491,24 @@ def plot_xy(fig,  Layer):
         Delimier = ","
         Encode = detectEncode(Path(Input))
         dataset = np.loadtxt(Input,dtype="str",delimiter=Delimier,encoding=Encode)
+        dataset = dataset.transpose()
     else:
         Delimier = None
         Encode = None
         dataset = np.loadtxt(Input,dtype="str",delimiter=Delimier,encoding=Encode)
+        dataset = dataset.transpose()
 
-    dataset = dataset.transpose()
     if TS:
         X = np.array(dataset[0],dtype="datetime64")
     else:
         X = np.array(dataset[0],dtype="float")
 
-    Y = np.loadtxt(dataset[1],dtype="float")
+    Y = np.array(dataset[1],dtype="float")
 
     if len(dataset) < 3:
         Z = np.zeros(len(X))
     else:
-        Z = dataset[2]
+        Z = np.array(dataset[2])
 
     if Size == "Data":
         Style = Type + "c"
@@ -708,8 +710,13 @@ if sys.argv[1] == "psts":
         configPS = copy.deepcopy(config)
         ListTask.append(multiprocessing.Process(target=plot_psts, args=(configPS,PS)))
     if __name__=='__main__':
+        TaskCount = 0
         for Task in ListTask:
             Task.start()
+            TaskCount = TaskCount + 1
+            if TaskCount == 16:
+                time.sleep(5)
+                TaskCount = 0
 else:
     if len(sys.argv) > 3:
         Input = sys.argv[3:len(sys.argv)]
