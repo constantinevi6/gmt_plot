@@ -30,7 +30,13 @@ g++ -std=c++11 -o lonlat2m lonlat2m.cpp -I/usr/include/boost169
 boost版本請修改至安裝的版本。
 
 Version history:
-
+- Release Ver. 2.1.0
+    - Feature: 重新設計IO。
+    - Feature: 重新定義多圖繪製。
+    - Feature: 強化散佈圖繪製功能。
+    - Feature: 新增通用型批次繪圖設定選項。
+    - Fix: 修正多執行緒重複執行主執行緒的問題。
+    
 - Release Ver. 2.0.1
     - Feature: 支援輸入獨立檔案之時間序列繪圖。
 
