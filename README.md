@@ -31,6 +31,10 @@ boost版本請修改至安裝的版本。
 
 Version history:
 - Release Ver. 2.1.0
+    - Feature: 新增GNSS三軸資料繪圖。
+    - Fix: 修正無限制多執行緒造成電腦當機的問題。
+
+- Release Ver. 2.1.0
     - Feature: 重新設計IO。
     - Feature: 重新定義多圖繪製。
     - Feature: 強化散佈圖繪製功能。

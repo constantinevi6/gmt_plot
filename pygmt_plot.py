@@ -19,7 +19,8 @@ from osgeo import osr
 from pathlib import Path
 #from obspy import UTCDateTime
 
-Version = "2.1.0"
+Version = "2.1.1"
+Debug = False
 
 def represent_dictionary_order(self, dict_data):
     return self.represent_mapping('tag:yaml.org,2002:map', dict_data.items())
@@ -46,56 +47,29 @@ def read_laz(DataInput):
     return dataset
 
 def read_GNSS(File, Header = 0):
-
+    print(f"Reading GNSS data from file: {File}")
     with open(File,'r') as fh:
         Content = fh.read()
         ContentLine = Content.split('\n')
     GNSS = [
         "",                               # GNSS Station Name
         np.empty((0),dtype=float),        # NEU Reference position (WGS84)
-        np.empty((0),dtype="datetime64"), # Year, month, day for the given position epoch
-        np.empty((0),dtype=np.str_),      # Hour, minute, second for the given position epoch
-        np.empty((0),dtype=float),        # Modified Julian day for the given position epoch
-        np.empty((0),dtype=float),        # X coordinate
-        np.empty((0),dtype=float),        # Y coordinate
-        np.empty((0),dtype=float),        # Z coordinate
-        np.empty((0),dtype=float),        # Standard deviation of the X position, meters
-        np.empty((0),dtype=float),        # Standard deviation of the Y position, meters
-        np.empty((0),dtype=float),        # Standard deviation of the Z position, meters
-        np.empty((0),dtype=float),        # Correlation of the X and Y position
-        np.empty((0),dtype=float),        # Correlation of the X and Z position
-        np.empty((0),dtype=float),        # Correlation of the Y and Z position
-        np.empty((0),dtype=float),        # Latitude
-        np.empty((0),dtype=float),        # Longitude
-        np.empty((0),dtype=float),        # Height relative to WGS-84 ellipsoid, m
-        np.empty((0),dtype=float),        # Difference in North component from NEU reference position, meters
-        np.empty((0),dtype=float),        # Difference in East component from NEU reference position, meters
-        np.empty((0),dtype=float),        # Difference in vertical component from NEU reference position, meters
-        np.empty((0),dtype=float),        # Standard deviation of dN, meters
-        np.empty((0),dtype=float),        # Standard deviation of dE, meters
-        np.empty((0),dtype=float),        # Standard deviation of dU, meters
-        np.empty((0),dtype=float),        # Correlation of dN and dE
-        np.empty((0),dtype=float),        # Correlation of dN and dU
-        np.empty((0),dtype=float),        # Correlation of dE and dU
-        np.empty((0),dtype=np.str_)       # "rapid", "final", "suppl/suppf", "campd", or "repro" corresponding to products generated with rapid or final orbit products, in supplemental processing, campaign data processing or reprocessing
-    ]
+        np.empty((0))                     # GNSS data record
+        ]
     GNSS[0] = ContentLine[3].split(":")[1].split()[0]
     Position = ContentLine[8].split(":")[1].split()
     Position = Position[0:3]
     GNSS[1] = np.array(Position)
-    for DataLine in ContentLine[Header:len(ContentLine)-1]:
-        Data = np.array(DataLine.split())
-        for i in range(0,21):
-            Record = 0
-            if i == 0:
-                dt = datetime.datetime.strptime(Data[i], "%Y%m%d")
-                Record = np.array(str(dt.strftime("%Y-%m-%d")),dtype="datetime64")
-            elif i == 1 or i == 21:
-                Record = np.array(Data[i],dtype=np.str_)
-            else:
-                Record = np.array(Data[i],dtype=float)
-            GNSS[i + 2] = np.append(GNSS[i + 2],Record)
-        
+    for i in range(Header, len(ContentLine)-1):
+        DataLine = ContentLine[i]
+        ArrDataLine = np.array(DataLine.split())
+        dt = datetime.datetime.strptime(ArrDataLine[0], "%Y%m%d")
+        ArrDataLine[0] = str(dt.strftime("%Y-%m-%d"))
+        if i == Header:
+            GNSS[2] = np.array([ArrDataLine])
+        else:
+            GNSS[2]=np.append([ArrDataLine],GNSS[2], axis=0)
+    GNSS[2] = GNSS[2].transpose()
     return GNSS
 
 def ll2m(P1, P2):
@@ -120,9 +94,9 @@ def m2lon(P, Radius):
 
 def getRange(Dataset, Mirror = False, Fit = False):
     if np.issubdtype(Dataset.dtype, np.datetime64):
-        Range_Min = Dataset[0].astype(datetime.datetime)
+        Range_Min = min(Dataset).astype(datetime.datetime)
         Range_Min = Range_Min.replace(day=1)
-        Range_Max = Dataset[len(Dataset) - 1].astype(datetime.datetime)
+        Range_Max = max(Dataset).astype(datetime.datetime)
         newMonth = (Range_Max.month -1 + 1) % 12 + 1
         Range_Max = Range_Max.replace(month=newMonth, day=1)
         return [Range_Min.strftime("%Y-%m-%d"), Range_Max.strftime("%Y-%m-%d")]
@@ -133,10 +107,16 @@ def getRange(Dataset, Mirror = False, Fit = False):
         elif not Mirror:
             Value_Min = abs(Dataset.min())
             Value_Max = abs(Dataset.max())
+            if Value_Min == 0:
+                Value_Min = -1
+            if Value_Max == 0:
+                Value_Max = 1
             Range_Min = -math.ceil(Value_Min/(10**(math.floor(math.log10(Value_Min)))))*(10**(math.floor(math.log10(Value_Min))))
             Range_Max = math.ceil(Value_Max/(10**(math.floor(math.log10(Value_Max)))))*(10**(math.floor(math.log10(Value_Max))))
         else:
             Value_Max = max(abs(Dataset.min()),abs(Dataset.max()))
+            if Value_Max == 0:
+                Value_Max = 1
             Range_Max = math.ceil(Value_Max/(10**(math.floor(math.log10(Value_Max)))))*(10**(math.floor(math.log10(Value_Max))))
             Range_Min = -Range_Max
         return [Range_Min, Range_Max]
@@ -210,13 +190,14 @@ def config_image(LayerID, config, Plot=True, Data_Path="", Type="Auto", Crop=Tru
         "Shade": False,
         }
 
-def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
+def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
     config["Layer"+str(LayerID)] = {
         "Layer": "psxy",
         "Plot": Plot,
         "File Path": str(Data_Path),
         "Time Series": TS,
         "Value": Value,
+        "Ratio": Ratio,
         "Size": float(Size),
         "Type": Type,
         "Pen": Pen,
@@ -319,7 +300,7 @@ def config_PSV(config, Input=""):
     NLayer += 1
     config_image(NLayer, config)
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, False, None, 0.02, "c", "", "cpt", "jet", CPT_Range)
+    config_xy(NLayer, config, True, DataInput, False, None, 1, 0.02, "c", "", "cpt", "jet", CPT_Range)
     Link = NLayer
     NLayer += 1
     config_colorbar(NLayer, config, True, Link, "TL", 0.5, 0.5, 6, 0.5, "c", "TL", "v", 1, -1, "LOS Velocity (mm/year)", max(CPT_Range), 10)
@@ -348,9 +329,9 @@ def config_PSTS(config):
     NLayer = 0
     config_basemap(config, Range_X[0], Range_X[1], Range_Y[0], Range_Y[1], "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
     NLayer += 1
-    config_xy(NLayer, config, False, DataInput, True, "Isolate", 0.1, "c", "", "", "categorical", [0])
+    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, 0.1, "c", "", "", "categorical", [0])
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, True, "Mean", 0.16, "c", "", "black", "", [0])
+    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, 0.16, "c", "", "black", "", [0])
     NLayer += 1
     config_text(NLayer, config, True, "Lontitude:   ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
     NLayer += 1
@@ -359,16 +340,16 @@ def config_PSTS(config):
     config_text(NLayer, config, True, "Picked PSs:  ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
 
 def config_GNSS(config, NPlot):
-    Color=["red", "green", "blue"]
-    YLable=["Latitude (mm)", "Longitude (mm)", "Heigh (mm)"]
+    Color=["blue", "green", "red"]
+    YLable=["Heigh (mm)", "Longitude (mm)", "Latitude (mm)"]
     NLayer = 0
-    if NPlot == 2:
-        config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", YLable[NPlot], 0, -10)
-    else:
-        config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "Wsen", 0, 0, False, 0, 10, True, "", YLable[NPlot], 0, -10)
-    NLayer += 1
-    config_xy(NLayer, config, True, "", True, None, 0.1, "c", "", Color[NPlot], "", [0])
     if NPlot == 0:
+        config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 0, True, "Time", YLable[NPlot], 0, 8.5)
+    else:
+        config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "Wsen", 0, 0, False, 0, 0, True, "", YLable[NPlot], 0, 8.5)
+    NLayer += 1
+    config_xy(NLayer, config, True, "", True, NPlot + 17, 1000, 0.1, "c", "", Color[NPlot], "", [0])
+    if NPlot == 2:
         NLayer += 1
         config_text(NLayer, config, True, "GNSS Station: ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
         NLayer += 1
@@ -402,8 +383,8 @@ def config_generate(Path_config, Type):
         config_PSTS(Plot)
         Config["Plot1"] = Plot
     elif Type == "gps":
-        config_io(Config, Type, False, [], [], "GMTPlot_" + Type, "png", True, 0, 0, 1, 1, "c")
-        for i in range(0,2):
+        config_io(Config, Type, True, ["Layer1"], [], "GMTPlot_" + Type, "png", True, 0, 0, 1, 1, "c")
+        for i in range(0,3):
             Plot = {}
             NPlot = "Plot" + str(i + 1)
             config_GNSS(Plot, i)
@@ -476,6 +457,8 @@ def plot_basemap(fig, Layer, Offset_X=0, Offset_Y=0):
     Region = [Left, Right, Lower, Upper]
     Frame = [Frame]
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle):
+        if Debug:
+            print(f"fig.basemap(region={Region}, projection={Projection}, frame={Frame}, transparency={Transparency})")
         fig.basemap(region=Region, projection=Projection, frame=Frame, transparency=Transparency)
 
 # 繪製海岸線
@@ -490,6 +473,8 @@ def plot_coast(
         arg_water=""
     if Land == True:
         arg_land=""
+    if Debug:
+        print(f"fig.coast(grid={Input},cmap=True)")
     fig.coast(
         grid       = Input,
         cmap       = True
@@ -547,6 +532,8 @@ def plot_Frame(fig, Layer):
         Frame_Y = Frame_Y + "+l" + "\"" + Y_Label + "\""
     Frame.append(Frame_Y)
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle, FORMAT_GEO_MAP="ddd.xxF"):
+        if Debug:
+            print(f"fig.basemap(frame={Frame})")
         fig.basemap(frame=Frame)
 
 # 繪製網格物件
@@ -654,14 +641,22 @@ def plot_xy(fig,  Layer, Dataset = 0):
     Input = Layer['File Path']
     TS = Layer['Time Series']
     Value = Layer['Value']
+    Ratio = Layer['Ratio']
     Size = Layer['Size']
     Type = Layer['Type']
     Pen = Layer['Pen']
     Fill = Layer['Fill']
     CMap = Layer['CPT']
     Series = Layer['CPT Range']
+    if Debug:
+        print(type(Input))
     if Dataset != 0:
         dataset = Dataset
+    elif type(Input) == np.ndarray:
+        dataset = Input
+    elif (Path(Input).suffix == ".pos"):
+        GNSSData = read_GNSS(Path(Input), 37)
+        dataset = GNSSData[2]
     elif (Path(Input).suffix == ".las") | (Path(Input).suffix == ".laz"):
         dataset = read_laz(Path(Input))
     elif Path(Input).suffix == ".csv":
@@ -674,7 +669,8 @@ def plot_xy(fig,  Layer, Dataset = 0):
         Encode = None
         dataset = np.loadtxt(Input,dtype="str",delimiter=Delimier,encoding=Encode)
         dataset = dataset.transpose()
-
+    if Debug:
+        print(dataset)
     if TS:
         X = np.array(dataset[0],dtype="datetime64")
     else:
@@ -689,8 +685,9 @@ def plot_xy(fig,  Layer, Dataset = 0):
     elif Value == "Isolate":
         Y = np.array(dataset[1:len(dataset)])
     else:
-        Y = np.array([dataset[Value]])
-
+        Y = np.array([dataset[Value]],dtype="float")
+    Y = Ratio * Y
+    
     if len(dataset) < 3:
         Z = np.zeros(X.size)
     elif Value == "Isolate":
@@ -726,6 +723,8 @@ def plot_xy(fig,  Layer, Dataset = 0):
     elif len(Fill) != 0:
         CMap = None
     for it in range(0,len(Y)):
+        if Debug:
+            print(f"fig.plot(x={X},y={Y[it]},style={Style},pen={Pen},size={Size},cmap={CMap},color={Fill})")
         fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
 
 def plot_colorbar(
@@ -876,7 +875,6 @@ def get_psts(config, ListConfig, ArrPS, Range = 1):
             yaml.dump(configMask, f, Dumper=yaml.CDumper, sort_keys=False)
         
     ListInput = []
-    ListMaskConfig = []
     ListTask = []
     for itPS in range(0,len(ArrPS)):
         if any(PS_Pick[itPS]):
@@ -924,18 +922,88 @@ def get_psts(config, ListConfig, ArrPS, Range = 1):
         Task.join()
     return ListInput
 
-def plot_gps(configGPS, GNSSDataset):
-    return 0
+def get_GNSS_data(InputFile, it, ListGNSS):
+    ListGNSS[it] = read_GNSS(InputFile, 37)
+    return ListGNSS[it]
+
+def get_GNSS_conf(config, it, InputFile, ListConfig, ListInput):
+    ConfigGPS = copy.deepcopy(config)
+    GNSSDataset = read_GNSS(InputFile, 37)
+    ListInput[it] = [InputFile]
+    ConfigGPS["IO"]["Output"] = ConfigGPS["IO"]["Output"] + "_" + GNSSDataset[0]
+    Range_X = getRange(np.array(GNSSDataset[2][0],dtype="datetime64"))
+    for i in range(0,3): 
+        NPlot = "Plot" + str(i + 1)
+        Range_Y = getRange(np.array(GNSSDataset[2][i + 17],dtype="float") * ConfigGPS[NPlot]["Layer1"]["Ratio"], True)
+        ConfigGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
+        ConfigGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
+        ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
+        ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
+        for nLayer in ConfigGPS[NPlot]:
+            Layer = ConfigGPS[NPlot][nLayer]
+            if Layer['Layer'] == "text":
+                if Layer['Text'].find("GNSS Station") != -1:
+                    Layer['Text'] = "GNSS Station:   " + GNSSDataset[0]
+                if Layer['Text'].find("Lontitude") != -1:
+                    Layer['Text'] = "Lontitude:   " + GNSSDataset[1][1]
+                if Layer['Text'].find("Latitude") != -1:
+                    Layer['Text'] = "Latitude:      " + GNSSDataset[1][0]
+    ListConfig[it] = ConfigGPS
+    return ListConfig[it]
+
+def get_gps(config, ListInputFile):
+    NGNSS = len(ListInputFile)
+    ListConfig = multiprocessing.Manager().list([{}]*NGNSS)
+    ListInput = multiprocessing.Manager().list([""]*NGNSS)
+    # ListTaskData = []
+    # for it in range(0,NGNSS):
+    #     ListTaskData.append(multiprocessing.Process(target=get_GNSS_data, args=(ListInputFile[it],it,ListGNSS)))
+    # parallelTask(ListTaskData)
+    ListTask = []
+    for it in range(0,NGNSS):
+        ListTask.append(multiprocessing.Process(target=get_GNSS_conf, args=(config, it, ListInputFile[it], ListConfig, ListInput)))
+    parallelTask(ListTask)
+    for Task in ListTask:
+        Task.join()
+    # ListInput = []
+    # ListConfig = []
+    # for InputFile in ListInputFile:
+    #     configGPS = copy.deepcopy(config)
+    #     GNSSDataset = read_GNSS(InputFile, 37)
+    #     ListInput.append([InputFile])
+    #     configGPS["IO"]["Output"] = configGPS["IO"]["Output"] + "_" + GNSSDataset[0]
+    #     Range_X = getRange(np.array(GNSSDataset[2][0],dtype="datetime64"))
+    #     for i in range(0,3): 
+    #         NPlot = "Plot" + str(i + 1)
+    #         Range_Y = getRange(np.array(GNSSDataset[2][i + 17],dtype="float") * configGPS[NPlot]["Layer1"]["Ratio"], True)
+    #         configGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
+    #         configGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
+    #         configGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
+    #         configGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
+    #         for nLayer in configGPS[NPlot]:
+    #             Layer = configGPS[NPlot][nLayer]
+    #             if Layer['Layer'] == "text":
+    #                 if Layer['Text'].find("GNSS Station") != -1:
+    #                     Layer['Text'] = "GNSS Station:   " + GNSSDataset[0]
+    #                 if Layer['Text'].find("Lontitude") != -1:
+    #                     Layer['Text'] = "Lontitude:   " + GNSSDataset[1][1]
+    #                 if Layer['Text'].find("Latitude") != -1:
+    #                     Layer['Text'] = "Latitude:      " + GNSSDataset[1][0]
+    #     ListConfig.append(configGPS)
+    return [ListInput,ListConfig]
 
 def plot(config):
     Type = config["IO"]["Type"]
     Input = config["IO"]["Input"]
+    Output = config['IO']['Output']
     Batch = config["IO"]["Batch"]
     Plot_Width = config["IO"]["Plot Width"]
     Plot_Hight = config["IO"]["Plot Hight"]
     PlotsROWS = config["IO"]["Plots Per Row"]
     Margins = config["IO"]["Margins"]
     MarginsUnit = config["IO"]["Margins Unit"]
+    print(f"Plotting figure: {Output}")
+
     NPlot = len(Input)
     if (NPlot == 0):
         NPlot = 1
@@ -981,24 +1049,28 @@ def plot(config):
 
         ShiftX = str(ShiftX) + MarginsUnit
         ShiftY = str(ShiftY) + MarginsUnit
+        if Debug:
+            print(f"Origin shift ({ShiftX},{ShiftY})")
         fig.shift_origin(xshift=ShiftX,yshift=ShiftY)
 
     # fig.show()
-    Output = config['IO']['Output']
-    if Batch:
+    if (Batch) & (Output == "GMTPlot_" + config['IO']['Type']):
         InputName = Path(Input[0]).stem
         Output = Output + InputName.replace(Output,"")
     Output = Output + "." + config['IO']['Format']
     fig.savefig(Output, transparent=config['IO']['Transparent'])
 
 def parallelTask(ListTask):
-    TaskCount = 0
-    for Task in ListTask:
-        Task.start()
-        TaskCount = TaskCount + 1
-        if TaskCount == 16:
-            # time.sleep(5)
-            TaskCount = 0
+    CPUs = multiprocessing.cpu_count()
+    Active = [False]*len(ListTask)
+    for it in range(0, len(ListTask)):
+        while sum(Active) >= CPUs:
+            for jt in range(0, len(ListTask)):
+                if not ListTask[jt].is_alive():
+                    Active[jt] = False
+        ListTask[it].start()
+        Active[it] = True
+            
 
 def main():
     print(f"pyGMT plot Version: {Version} by Constantine VI.")
@@ -1042,40 +1114,15 @@ def main():
                 print("Input is not a coordinate of a single point.")
         ListInput = get_psts(config, ListConfig, ArrPS, Range)
 
-    elif sys.argv[1] == "gps":
-        if len(sys.argv) > 3:
-            ListInput = sys.argv[3:len(sys.argv)]
+    elif config["IO"]["Type"] == "gps":
+        if len(sys.argv) >= 2:
+            ListInputFile = sys.argv[2:len(sys.argv)]
         else:
-            ListInput = []
-    
-        ListTask = []
-        for InputFile in ListInput:
-            configGPS = copy.deepcopy(config)
-            GNSSDataset = read_GNSS(InputFile, 37)
-            configGPS["Plot1"]["IO"]["Ouput Name"] = configGPS["Plot1"]["IO"]["Ouput Name"] + "_" + GNSSDataset[0]
-            Range_X_Min = GNSSDataset[2][0].astype(datetime.datetime)
-            Range_X_Min = Range_X_Min.replace(day=1)
-            Range_X_Max = GNSSDataset[2][len(GNSSDataset[2]) - 1].astype(datetime.datetime)
-            newMonth = (Range_X_Max.month -1 + 1) % 12 + 1
-            Range_X_Max = Range_X_Max.replace(month=newMonth, day=1)
-            for i in range(0,2):
-                NPlot = "Plot" + str(i + 1)
-                Max_Y = max(abs(GNSSDataset[i + 17].min()),abs(GNSSDataset[i + 17].max()))
-                Range_Y = math.ceil(Max_Y/(10**(math.floor(math.log10(Max_Y)))))*(10**(math.floor(math.log10(Max_Y))))
-                configGPS[NPlot]["basemap"]["Edge Left"] = Range_X_Min
-                configGPS[NPlot]["basemap"]["Edge Right"] = Range_X_Max
-                configGPS[NPlot]["basemap"]["Edge Lower"] = -Range_Y
-                configGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y
-                if i == 0:
-                    for Layer in configGPS[NPlot]:
-                        if Layer["Layer"] == "text":
-                            if Layer['Text'].find("GNSS Station") != -1:
-                                Layer['Text'] = "GNSS Station:   " + GNSSDataset[0]
-                            if Layer['Text'].find("Lontitude") != -1:
-                                Layer['Text'] = "Lontitude:   " + GNSSDataset[1][1]
-                            if Layer['Text'].find("Latitude") != -1:
-                                Layer['Text'] = "Latitude:      " + GNSSDataset[1][0]
-            ListTask.append(multiprocessing.Process(target=plot_gps, args=(configGPS, GNSSDataset)))
+            print("No input for GNSS time series plot, exiting.")
+            exit(0)
+        ListInputGNSS = get_gps(config, ListInputFile)
+        ListConfig = ListInputGNSS[1]
+        ListInput = ListInputGNSS[0]
     else:
         if len(sys.argv) > 2:
             for it in range(2,len(sys.argv)):
@@ -1086,8 +1133,10 @@ def main():
             ListConfig.append(copy.deepcopy(config))
     ListTask = []
     for it in range(0,len(ListInput)):
-        ListConfig[it]["IO"]["Input"] = ListInput[it]
-        ListTask.append(multiprocessing.Process(target=plot, args=(ListConfig[it],)))
+        itConfig = ListConfig[it]
+        itConfig["IO"]["Input"] = ListInput[it]
+        ListTask.append(multiprocessing.Process(target=plot, args=(itConfig,)))
+    
     parallelTask(ListTask)
     for Task in ListTask:
         Task.join()
