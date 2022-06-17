@@ -17,10 +17,12 @@ from collections import OrderedDict
 from osgeo import gdal
 from osgeo import osr
 from pathlib import Path
+from pathlib import PurePath
 #from obspy import UTCDateTime
 
 Version = "2.1.1"
 Debug = False
+CurrentPath = Path.cwd()
 
 def represent_dictionary_order(self, dict_data):
     return self.represent_mapping('tag:yaml.org,2002:map', dict_data.items())
@@ -68,7 +70,7 @@ def read_GNSS(File, Header = 0):
         if i == Header:
             GNSS[2] = np.array([ArrDataLine])
         else:
-            GNSS[2]=np.append([ArrDataLine],GNSS[2], axis=0)
+            GNSS[2]=np.append(GNSS[2], [ArrDataLine], axis=0)
     GNSS[2] = GNSS[2].transpose()
     return GNSS
 
@@ -97,9 +99,10 @@ def getRange(Dataset, Mirror = False, Fit = False):
         Range_Min = min(Dataset).astype(datetime.datetime)
         Range_Min = Range_Min.replace(day=1)
         Range_Max = max(Dataset).astype(datetime.datetime)
-        newMonth = (Range_Max.month -1 + 1) % 12 + 1
-        Range_Max = Range_Max.replace(month=newMonth, day=1)
-        return [Range_Min.strftime("%Y-%m-%d"), Range_Max.strftime("%Y-%m-%d")]
+        newMonth = (Range_Max.month % 12) + 1
+        newYear = math.floor((Range_Max.month) / 12)
+        Range_Max = Range_Max.replace(year=Range_Max.year+newYear, month=newMonth, day=1)
+        return [Range_Min, Range_Max]
     else:
         if Fit:
             Range_Min = Dataset.min()
@@ -135,7 +138,7 @@ def help_info():
     print("    gpsv: map contain GNSS mean velocity in ENU of single GNSS station.")
     print("    gpsl: time series of deformation project to SAR LOS of single GNSS station.")
 
-def config_io(config, Type="custom", Batch=False, Layer=[], Input=[], Output="", Format="png", Transparent=True, Width=0, Hight=0, SubPlotX=1, Margins=1, Unit="c", Additional=[""]):
+def config_io(config, Type="custom", Batch=False, Layer=[], Input=[], Output="", Format="png", Transparent=True, Width=0, Hight=0, SubPlotX=1, Margins=1, Unit="c", Additional=[]):
     config["IO"] = {
         "Type": Type,
         "Batch": Batch,
@@ -348,7 +351,7 @@ def config_GNSS(config, NPlot):
     else:
         config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "Wsen", 0, 0, False, 0, 0, True, "", YLable[NPlot], 0, 8.5)
     NLayer += 1
-    config_xy(NLayer, config, True, "", True, NPlot + 17, 1000, 0.1, "c", "", Color[NPlot], "", [0])
+    config_xy(NLayer, config, True, "", True, 17 - NPlot, 1000, 0.1, "c", "", Color[NPlot], "", [0])
     if NPlot == 2:
         NLayer += 1
         config_text(NLayer, config, True, "GNSS Station: ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
@@ -371,7 +374,7 @@ def config_generate(Path_config, Type):
     elif Type == "ts":
         Plot = {}
         config_basemap(Plot)
-        config_xy(Plot)
+        config_xy(1, Plot, True, "", True, None, 1, 0.16, "c", "", "blue", "", [0])
         Config["Plot1"] = Plot
     elif Type == "psv":
         Plot = {}
@@ -391,11 +394,11 @@ def config_generate(Path_config, Type):
             Config[NPlot] = Plot
     else:
         config_basemap(Plot)
-        config_image(Plot)
-        config_xy(Plot)
-        config_colorbar(Plot)
-        config_compass(Plot)
-        config_scale(Plot)
+        config_image(1, Plot)
+        config_xy(2, Plot)
+        config_colorbar(3, Plot)
+        config_compass(4, Plot)
+        config_scale(5, Plot)
         Config["Plot1"] = Plot
         
     print(f"Please setup {Path_config} for input.")
@@ -854,28 +857,11 @@ def get_psts(config, ListConfig, ArrPS, Range = 1):
                     ListPSData[itPS] = [itDS[2, PS_Pick[itPS]]]
                 else:
                     ListPSData[itPS] = np.append(ListPSData[itPS], [itDS[2, PS_Pick[itPS]]], axis=0)
-    
-    AdditionPlots = config["IO"]["Additional Plot"]
-    if len(AdditionPlots[0]) == 0:
-        AdditionPlots[0] = "pygmt_config_psmask.yml"
-        configFile = Path("pygmt_config_psv.yml")
-        if not configFile.exists():
-            config_generate(configFile, "psv")
-        configMask = config_load(configFile)
-        configMask["IO"]["Output"] = "GMTPlot_psts"
-        Plot = configMask["Plot1"]
-        for itLayer in Plot:
-            Layer = Plot[itLayer]
-            if itLayer == "Layer2":
-                Layer["Fill"] = None
-                Layer["Pen"] = "2p,yellow"
-            else:
-                Layer["Plot"] = False
-        with open(AdditionPlots[0], "w") as f:
-            yaml.dump(configMask, f, Dumper=yaml.CDumper, sort_keys=False)
         
     ListInput = []
+    ListAddInput = []
     ListTask = []
+    ListArgInput = []
     for itPS in range(0,len(ArrPS)):
         if any(PS_Pick[itPS]):
             itconfig = copy.deepcopy(config)
@@ -910,35 +896,69 @@ def get_psts(config, ListConfig, ArrPS, Range = 1):
             ListInput.append([FileData])
             np.savetxt(FilePS, ListPS[itPS].transpose(), fmt="%3.8f")
             ListConfig.append(itconfig)
+            ListAddInput.append([FilePS])
+            # configFile = Path(AdditionPlots[0])
+            # print(f"Create mask for PS: {Lon} {Lat}.")
+            # configMask = config_load(configFile)
+            # configMask["IO"]["Output"] = configMask["IO"]["Output"] + "_" + str(format(Lon, '.5f')) + "_" + str(format(Lat, '.6f')) + "_mask"
+            # configMask["Plot1"]["Layer2"]["File Path"] = FilePS
+            # ArgInput = (copy.deepcopy(configMask),)
+            # ListArgInput.append(ArgInput)
+    # parallelPool(plot, ListArgInput)
 
-            configFile = Path(AdditionPlots[0])
-            print(f"Create mask for PS: {Lon} {Lat}.")
+            # ListTask.append(multiprocessing.Process(target=plot, args=(copy.deepcopy(configMask),)))
+
+    AdditionPlots = config["IO"]["Additional Plot"]
+    if len(AdditionPlots[0]) == 0:
+        AdditionPlots[0] = "pygmt_config_psmask.yml"
+    configFile = Path(AdditionPlots[0])
+    if not configFile.exists():
+        configFilePSV = Path("pygmt_config_psv.yml")
+        if configFilePSV.exists():
+            configMask = config_load(configFilePSV)
+        else:
+            config_generate(configFile, "psv")
             configMask = config_load(configFile)
-            configMask["IO"]["Output"] = configMask["IO"]["Output"] + "_" + str(format(Lon, '.5f')) + "_" + str(format(Lat, '.6f')) + "_mask"
-            configMask["Plot1"]["Layer2"]["File Path"] = FilePS
-            ListTask.append(multiprocessing.Process(target=plot, args=(copy.deepcopy(configMask),)))
-    parallelTask(ListTask)
-    for Task in ListTask:
-        Task.join()
+
+        configMask["IO"]["Batch"] = True
+        configMask["IO"]["Layer"] = ["Layer2"]
+        configMask["IO"]["Input"] = ListAddInput
+        configMask["IO"]["Output"] = "GMTPlot_psmask"
+        Plot = configMask["Plot1"]
+        for itLayer in Plot:
+            Layer = Plot[itLayer]
+            if itLayer == "Layer2":
+                Layer["Size"] = Layer["Size"] * 1.5
+                Layer["Fill"] = None
+                Layer["Pen"] = "2p,white"
+            else:
+                Layer["Plot"] = False
+        with open(AdditionPlots[0], "w") as f:
+            yaml.dump(configMask, f, Dumper=yaml.CDumper, sort_keys=False)
+    # parallelTask(ListTask)
+    # for Task in ListTask:
+    #     Task.join()
     return ListInput
 
-def get_GNSS_data(InputFile, it, ListGNSS):
-    ListGNSS[it] = read_GNSS(InputFile, 37)
-    return ListGNSS[it]
-
 def get_GNSS_conf(config, it, InputFile, ListConfig, ListInput):
+    pygmt._begin()
     ConfigGPS = copy.deepcopy(config)
     GNSSDataset = read_GNSS(InputFile, 37)
     ListInput[it] = [InputFile]
     ConfigGPS["IO"]["Output"] = ConfigGPS["IO"]["Output"] + "_" + GNSSDataset[0]
+    ConfigGPS["IO"]["Input"] = [InputFile]
     Range_X = getRange(np.array(GNSSDataset[2][0],dtype="datetime64"))
     for i in range(0,3): 
         NPlot = "Plot" + str(i + 1)
-        Range_Y = getRange(np.array(GNSSDataset[2][i + 17],dtype="float") * ConfigGPS[NPlot]["Layer1"]["Ratio"], True)
-        ConfigGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
-        ConfigGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
-        ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
-        ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
+        Range_Y = getRange(np.array(GNSSDataset[2][17 - i],dtype="float") * ConfigGPS[NPlot]["Layer1"]["Ratio"], True)
+        if ConfigGPS[NPlot]["basemap"]["Edge Left"] == 0:
+            ConfigGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
+        if ConfigGPS[NPlot]["basemap"]["Edge Right"] == 0:
+            ConfigGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
+        if ConfigGPS[NPlot]["basemap"]["Edge Lower"] == 0:
+            ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
+        if ConfigGPS[NPlot]["basemap"]["Edge Upper"] == 0:
+            ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
         for nLayer in ConfigGPS[NPlot]:
             Layer = ConfigGPS[NPlot][nLayer]
             if Layer['Layer'] == "text":
@@ -949,47 +969,18 @@ def get_GNSS_conf(config, it, InputFile, ListConfig, ListInput):
                 if Layer['Text'].find("Latitude") != -1:
                     Layer['Text'] = "Latitude:      " + GNSSDataset[1][0]
     ListConfig[it] = ConfigGPS
+    pygmt._end()
     return ListConfig[it]
 
 def get_gps(config, ListInputFile):
     NGNSS = len(ListInputFile)
     ListConfig = multiprocessing.Manager().list([{}]*NGNSS)
     ListInput = multiprocessing.Manager().list([""]*NGNSS)
-    # ListTaskData = []
-    # for it in range(0,NGNSS):
-    #     ListTaskData.append(multiprocessing.Process(target=get_GNSS_data, args=(ListInputFile[it],it,ListGNSS)))
-    # parallelTask(ListTaskData)
-    ListTask = []
+    ListArgInput = []
     for it in range(0,NGNSS):
-        ListTask.append(multiprocessing.Process(target=get_GNSS_conf, args=(config, it, ListInputFile[it], ListConfig, ListInput)))
-    parallelTask(ListTask)
-    for Task in ListTask:
-        Task.join()
-    # ListInput = []
-    # ListConfig = []
-    # for InputFile in ListInputFile:
-    #     configGPS = copy.deepcopy(config)
-    #     GNSSDataset = read_GNSS(InputFile, 37)
-    #     ListInput.append([InputFile])
-    #     configGPS["IO"]["Output"] = configGPS["IO"]["Output"] + "_" + GNSSDataset[0]
-    #     Range_X = getRange(np.array(GNSSDataset[2][0],dtype="datetime64"))
-    #     for i in range(0,3): 
-    #         NPlot = "Plot" + str(i + 1)
-    #         Range_Y = getRange(np.array(GNSSDataset[2][i + 17],dtype="float") * configGPS[NPlot]["Layer1"]["Ratio"], True)
-    #         configGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
-    #         configGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
-    #         configGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
-    #         configGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
-    #         for nLayer in configGPS[NPlot]:
-    #             Layer = configGPS[NPlot][nLayer]
-    #             if Layer['Layer'] == "text":
-    #                 if Layer['Text'].find("GNSS Station") != -1:
-    #                     Layer['Text'] = "GNSS Station:   " + GNSSDataset[0]
-    #                 if Layer['Text'].find("Lontitude") != -1:
-    #                     Layer['Text'] = "Lontitude:   " + GNSSDataset[1][1]
-    #                 if Layer['Text'].find("Latitude") != -1:
-    #                     Layer['Text'] = "Latitude:      " + GNSSDataset[1][0]
-    #     ListConfig.append(configGPS)
+        ArgInput = (config, it, ListInputFile[it], ListConfig, ListInput)
+        ListArgInput.append(ArgInput)
+    parallelPool(get_GNSS_conf, ListArgInput)
     return [ListInput,ListConfig]
 
 def plot(config):
@@ -1002,11 +993,13 @@ def plot(config):
     PlotsROWS = config["IO"]["Plots Per Row"]
     Margins = config["IO"]["Margins"]
     MarginsUnit = config["IO"]["Margins Unit"]
+    AdditionPlots = config["IO"]["Additional Plot"]
     print(f"Plotting figure: {Output}")
-
+    
     NPlot = len(Input)
     if (NPlot == 0):
         NPlot = 1
+    pygmt._begin()
     fig = pygmt.Figure()
     pygmt.config(FONT="Times-Roman")
     if Type == "psts":
@@ -1027,7 +1020,10 @@ def plot(config):
             for iLayer in Plot:
                 Layer = Plot[iLayer]
                 if iLayer in config["IO"]["Layer"]:
-                    Layer["File Path"] = config["IO"]["Input"][it]
+                    Path_File = config["IO"]["Input"][it]
+                    if not PurePath(Path_File).is_absolute():
+                        Path_File = CurrentPath / Path_File
+                    Layer["File Path"] = Path_File
 
                 if Layer['Layer'] == "grdimage":
                     if not Layer['Plot']:
@@ -1054,11 +1050,22 @@ def plot(config):
         fig.shift_origin(xshift=ShiftX,yshift=ShiftY)
 
     # fig.show()
-    if (Batch) & (Output == "GMTPlot_" + config['IO']['Type']):
+    InputName = ""
+    if (Batch):
         InputName = Path(Input[0]).stem
-        Output = Output + InputName.replace(Output,"")
-    Output = Output + "." + config['IO']['Format']
-    fig.savefig(Output, transparent=config['IO']['Transparent'])
+        InputName = InputName.replace(Output,"")
+        Output = Output + "_" + InputName
+    if not PurePath(Output).is_absolute():
+        Output = CurrentPath / Path(Output)
+
+    fig.psconvert(prefix=Output, fmt="G", crop=True)
+    # Output = Output + "." + config['IO']['Format']
+    # fig.savefig(Output, transparent=config['IO']['Transparent'])
+    # for AdditionPlot in AdditionPlots:
+    #     ConfigAddPlot = config_load(AdditionPlot)
+    #     ConfigAddPlot['IO']['Output'] = ConfigAddPlot['IO']['Output'] + "_" + InputName
+    #     plot(ConfigAddPlot)
+    pygmt._end()
 
 def parallelTask(ListTask):
     CPUs = multiprocessing.cpu_count()
@@ -1071,6 +1078,12 @@ def parallelTask(ListTask):
         ListTask[it].start()
         Active[it] = True
             
+def parallelPool(function, ListArg, Threads=multiprocessing.cpu_count()):
+    if len(ListArg) < Threads:
+        Threads = len(ListArg)
+    pool = multiprocessing.Pool(Threads)
+    pool_outputs = pool.starmap(function, ListArg)
+    pool.close()
 
 def main():
     print(f"pyGMT plot Version: {Version} by Constantine VI.")
@@ -1088,7 +1101,7 @@ def main():
 
     ListInput = []
     ListConfig = []
-
+    Threads=multiprocessing.cpu_count()
     if config["IO"]["Type"] == "psts":
         if len(sys.argv) == 2:
             print("No input for PS time series plot, exiting.")
@@ -1129,17 +1142,22 @@ def main():
                 ListInput.append([sys.argv[it]])
                 ListConfig.append(copy.deepcopy(config))
         else:
-            ListInput = [[0]]
-            ListConfig.append(copy.deepcopy(config))
+            ListInput = config["IO"]["Input"]
+            if ListInput == []:
+                ListInput=[[0]]
+            for Input in ListInput:
+                ListConfig.append(copy.deepcopy(config))
     ListTask = []
+    ListArgs = []
     for it in range(0,len(ListInput)):
         itConfig = ListConfig[it]
         itConfig["IO"]["Input"] = ListInput[it]
-        ListTask.append(multiprocessing.Process(target=plot, args=(itConfig,)))
-    
-    parallelTask(ListTask)
-    for Task in ListTask:
-        Task.join()
+        ListArgs.append((itConfig,))
+        # ListTask.append(multiprocessing.Process(target=plot, args=(itConfig,)))
+    parallelPool(plot, ListArgs, Threads)
+    # parallelTask(ListTask)
+    # for Task in ListTask:
+    #     Task.join()
 
 # Main
 if __name__=='__main__':
