@@ -20,7 +20,7 @@ from pathlib import Path
 from pathlib import PurePath
 #from obspy import UTCDateTime
 
-Version = "2.1.1"
+Version = "2.2.0"
 Debug = False
 CurrentPath = Path.cwd()
 
@@ -29,6 +29,11 @@ def represent_dictionary_order(self, dict_data):
 
 def setup_yaml():
     yaml.add_representer(OrderedDict, represent_dictionary_order)   
+
+def codedemo(code):
+    if Debug == True:
+        for itcode in code:
+            print(itcode)
 
 def detectEncode(DataInput):
     rawdata = open(DataInput, "rb").read()
@@ -430,7 +435,7 @@ def config_load(Type="", Path_config=""):
     return Config
 
 # 繪製框架
-def plot_basemap(fig, Layer, Offset_X=0, Offset_Y=0):
+def plot_basemap(fig, Layer, Offset_X=0, Offset_Y=0, Code=[]):
     Left = Layer['Edge Left']
     Right = Layer['Edge Right']
     Lower = Layer['Edge Lower']
@@ -460,9 +465,10 @@ def plot_basemap(fig, Layer, Offset_X=0, Offset_Y=0):
     Region = [Left, Right, Lower, Upper]
     Frame = [Frame]
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle):
-        if Debug:
-            print(f"fig.basemap(region={Region}, projection={Projection}, frame={Frame}, transparency={Transparency})")
         fig.basemap(region=Region, projection=Projection, frame=Frame, transparency=Transparency)
+
+    Code.append(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\"")
+    Code.append(f"    fig.basemap(region={Region}, projection=\"{Projection}\", frame={Frame}, transparency={Transparency})")
 
 # 繪製海岸線
 def plot_coast(
@@ -470,7 +476,8 @@ def plot_coast(
         Input,
         Shorelines="default,black",
         Water=True,
-        Land=False
+        Land=False,
+        Code=[]
     ):
     if Water == False:
         arg_water=""
@@ -482,9 +489,10 @@ def plot_coast(
         grid       = Input,
         cmap       = True
     )
+    Code.append(f"fig.coast(grid=\"{Input}\",cmap=True)")
 
 # 繪製地圖框線
-def plot_Frame(fig, Layer):
+def plot_Frame(fig, Layer, Code=[]):
     FrameStyle = Layer['Map Frame Style']
     Frame = Layer['Map Frame']
     X_Label = Layer['Map X Label']
@@ -535,12 +543,12 @@ def plot_Frame(fig, Layer):
         Frame_Y = Frame_Y + "+l" + "\"" + Y_Label + "\""
     Frame.append(Frame_Y)
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle, FORMAT_GEO_MAP="ddd.xxF"):
-        if Debug:
-            print(f"fig.basemap(frame={Frame})")
         fig.basemap(frame=Frame)
+    Code.append(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\", FORMAT_GEO_MAP=\"ddd.xxF\"):")
+    Code.append(f"    fig.basemap(frame={Frame})")
 
 # 繪製網格物件
-def plot_img(fig, Layer, Left, Right, Lower, Upper):
+def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
     Input = Layer['File Path']
     Type = Layer['Type']
     CMap = Layer['CPT']
@@ -562,9 +570,9 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper):
         hSRS = osr.SpatialReference()
         if hSRS.ImportFromWkt(pszProjection) == gdal.CE_None:
             CSRName = hSRS.GetName()
-            print("Coordinate System is:%s" % CSRName)
+            print("Coordinate System is: %s" % CSRName)
         else:
-            print("Coordinate System is `%s'" % pszProjection)
+            print("Coordinate System is: '%s'" % pszProjection)
 
     Region = [Left, Right, Lower, Upper]
     if CSRName == "WGS 84":
@@ -582,8 +590,8 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper):
             Path_Crop = Path("Crop_" + str(Path(Input).stem) + ".tif")
         print(f"Starting crop file {Path_Grd} to {Path_Crop}....")
         gdalcmd = f"gdal_translate -projwin {Left} {Upper} {Right} {Lower} -of GTiff {Path_Grd} {Path_Crop}"
-        print(gdalcmd)
         os.system(gdalcmd)
+        Code.append(f"os.system(\"{gdalcmd}\")")
     else:
         Path_Crop = Path_Grd
 
@@ -621,6 +629,7 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper):
             Series = [stats[0], stats[1], Interval]
             
         pygmt.makecpt(cmap=CMap, series=Series)
+        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         CMap = True
 
     print("Plotting grd....")
@@ -628,7 +637,7 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper):
         grid         = Path_Crop,
         cmap         = CMap,
     )
-    
+    Code.append(f"fig.grdimage(grid=\"{Path_Crop}\",cmap={CMap})")
     if Shade & (Type != "Optical"):
         print("Starting plot shade....")
         Grd_Shade = pygmt.grdgradient(grid=Path_Crop, radiance=[270, 30])
@@ -638,9 +647,14 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper):
             cmap       = True,
             transparency = 50,
         )
+        Grd_Shade.close()
+        Code.append(f"Grd_Shade = pygmt.grdgradient(grid=\"{Path_Crop}\", radiance=[270, 30])")
+        Code.append(f"pygmt.makecpt(cmap=\"gray\", series=[-1.5, 0.3, 0.01])")
+        Code.append(f"fig.grdimage(grid=Grd_Shade,cmap=True,transparency=50)")
+        Code.append(f"Grd_Shade.close()")
 
 # 繪製點物件
-def plot_xy(fig,  Layer, Dataset = 0):
+def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     Input = Layer['File Path']
     TS = Layer['Time Series']
     Value = Layer['Value']
@@ -719,6 +733,7 @@ def plot_xy(fig,  Layer, Dataset = 0):
             Interval = (max(Z) - min(Z)) / 100
             Series = [min(Z), max(Z), Interval]
         pygmt.makecpt(cmap=CMap, series=Series)
+        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         Fill = Z
         CMap = True
     elif Fill == None:
@@ -726,14 +741,16 @@ def plot_xy(fig,  Layer, Dataset = 0):
     elif len(Fill) != 0:
         CMap = None
     for it in range(0,len(Y)):
-        if Debug:
-            print(f"fig.plot(x={X},y={Y[it]},style={Style},pen={Pen},size={Size},cmap={CMap},color={Fill})")
         fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
+        Code.append(f"X={X}")
+        Code.append(f"Y={Y[it]}")
+        Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
 
 def plot_colorbar(
         fig,
         Layer,
-        LinkLayer=0
+        LinkLayer=0,
+        Code=[]
 ):
     Position = Layer['Position']
     Position_X_Offset = Layer['Position X Offset']
@@ -789,8 +806,10 @@ def plot_colorbar(
         cmap     = True,
         box      = Box
     )
+    Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+    Code.append(f"fig.colorbar(position=\"{Position}\",frame={Frame},cmap=True,box=\"{Box}\")")
 
-def plot_text(fig, Layer):
+def plot_text(fig, Layer, Code=[]):
     Text = Layer['Text']
     Position_X = Layer['Position X']
     Position_Y = Layer['Position Y']
@@ -820,6 +839,7 @@ def plot_text(fig, Layer):
     if len(Clearance) == 0:
         Clearance = None
     fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap,xshift=Offset_X,yshift=Offset_Y)
+    Code.append(f"fig.text(text=\"{Text}\",x={Position_X},y={Position_Y},position={Position},offset=\"{Offset}\",font=\"{Font}\",justify=\"{Justify}\",angle={Angle},clearance=\"{Clearance}\",fill=\"{Fill}\",pen=\"{Pen}\",no_clip={NoClip},transparency={Transparency},wrap={Wrap},xshift={Offset_X},yshift={Offset_Y})")
 
 def get_psts(config, ListConfig, ArrPS, Range = 1):
     DataInput = Path(".")
@@ -984,6 +1004,7 @@ def get_gps(config, ListInputFile):
     return [ListInput,ListConfig]
 
 def plot(config):
+    Code = ["import pygmt", "import os"]
     Type = config["IO"]["Type"]
     Input = config["IO"]["Input"]
     Output = config['IO']['Output']
@@ -1001,6 +1022,7 @@ def plot(config):
         NPlot = 1
     pygmt._begin()
     fig = pygmt.Figure()
+    Code.append("fig = pygmt.Figure()")
     pygmt.config(FONT="Times-Roman")
     if Type == "psts":
         pygmt.config(MAP_GRID_PEN_PRIMARY="thinnest,-")
@@ -1016,7 +1038,7 @@ def plot(config):
             if iPlot == "IO":
                 continue
             Plot = config[iPlot]
-            plot_basemap(fig, Plot['basemap'])
+            plot_basemap(fig, Plot['basemap'],Code = Code)
             for iLayer in Plot:
                 Layer = Plot[iLayer]
                 if iLayer in config["IO"]["Layer"]:
@@ -1028,27 +1050,25 @@ def plot(config):
                 if Layer['Layer'] == "grdimage":
                     if not Layer['Plot']:
                         continue
-                    plot_img(fig, Layer, Plot["basemap"]["Edge Left"], Plot["basemap"]["Edge Right"], Plot["basemap"]["Edge Lower"], Plot["basemap"]["Edge Upper"])
+                    plot_img(fig, Layer, Plot["basemap"]["Edge Left"], Plot["basemap"]["Edge Right"], Plot["basemap"]["Edge Lower"], Plot["basemap"]["Edge Upper"],Code = Code)
                 elif Layer['Layer'] == "psxy":
                     if not Layer['Plot']:
                         continue
                     Dataset = 0
-                    plot_xy(fig, Layer, Dataset)
+                    plot_xy(fig, Layer, Dataset,Code = Code)
                 elif Layer['Layer'] == "colorbar":
                     if not Layer['Plot']:
                         continue
-                    plot_colorbar(fig, Layer, Plot[Layer['Link']])
+                    plot_colorbar(fig, Layer, Plot[Layer['Link']],Code = Code)
                 elif Layer['Layer'] == "text":
-                    plot_text(fig, Layer)
+                    plot_text(fig, Layer,Code = Code)
 
-            plot_Frame(fig, Plot['basemap'])
+            plot_Frame(fig, Plot['basemap'],Code = Code)
 
         ShiftX = str(ShiftX) + MarginsUnit
         ShiftY = str(ShiftY) + MarginsUnit
-        if Debug:
-            print(f"Origin shift ({ShiftX},{ShiftY})")
         fig.shift_origin(xshift=ShiftX,yshift=ShiftY)
-
+        Code.append(f"fig.shift_origin(xshift=\"{ShiftX}\",yshift=\"{ShiftY}\")")
     # fig.show()
     InputName = ""
     if (Batch):
@@ -1057,14 +1077,16 @@ def plot(config):
         Output = Output + "_" + InputName
     if not PurePath(Output).is_absolute():
         Output = CurrentPath / Path(Output)
-
-    fig.psconvert(prefix=Output, fmt="G", crop=True)
+    OutputFormat = "G"
+    fig.psconvert(prefix=Output, fmt=OutputFormat, crop=True)
+    Code.append(f"fig.psconvert(prefix=\"{Output}\", fmt=\"{OutputFormat}\", crop=True)")
     # Output = Output + "." + config['IO']['Format']
     # fig.savefig(Output, transparent=config['IO']['Transparent'])
     # for AdditionPlot in AdditionPlots:
     #     ConfigAddPlot = config_load(AdditionPlot)
     #     ConfigAddPlot['IO']['Output'] = ConfigAddPlot['IO']['Output'] + "_" + InputName
     #     plot(ConfigAddPlot)
+    codedemo(Code)
     pygmt._end()
 
 def parallelTask(ListTask):
