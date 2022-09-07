@@ -698,7 +698,7 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
         Code.append(f"fig.grdimage(grid=Grd_Shade,cmap=True,transparency=50)")
         Code.append(f"Grd_Shade.close()")
 
-# 繪製點物件
+# 繪製向量物件
 def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     Input = Layer['File Path']
     TS = Layer['Time Series']
@@ -757,14 +757,18 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     else:
         Z = np.array(dataset[2])
 
-    if Size == "Data":
-        Style = Type + "c"
-        if Series != [0]:
-            Size = Z * (Series[1] - Series[0]) / (max(Z) - min(Z))
+    if Type != None:   
+        if Size == "Data":
+            Style = Type + "c"
+            if Series != [0]:
+                Size = Z * (Series[1] - Series[0]) / (max(Z) - min(Z))
+            else:
+                Size = Z
         else:
-            Size = Z
+            Style = Type + str(Size) + "c"
+            Size = None
     else:
-        Style = Type + str(Size) + "c"
+        Style = None
         Size = None
 
     if len(Pen) ==0:
