@@ -294,6 +294,22 @@ def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0,
         "Y Offset": float(Y_Offset),
         }
 
+def config_profile(LayerID, config, Plot=False, Data_Path="", Vector_Profile=[],):
+    config["Layer"+str(LayerID)] = {
+        "Layer": "profile",
+        "Plot": Plot,
+        "File Path": str(Data_Path),
+        "Time Series": TS,
+        "Value": Value,
+        "Ratio": Ratio,
+        "Size": float(Size),
+        "Type": Type,
+        "Pen": Pen,
+        "Fill": Fill,
+        "CPT": CPT,
+        "CPT Range": Range,
+        }
+
 def config_PSV(config, Input=""):
     DataInput = Path(Input)
     if len(Input) == 0:
@@ -364,6 +380,35 @@ def config_GNSS(config, NPlot):
         config_text(NLayer, config, True, "Lontitude:    ", None, None, "TL", 0.5, -1, "Times-Roman", "10p", "black", "BL", 0)
         NLayer += 1
         config_text(NLayer, config, True, "Latitude:     ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
+
+def config_PSProfile(config):
+    DataInput = Path(f".")
+    ListData = []
+    ListDate = np.empty(0,dtype="datetime64")
+    for itData in os.listdir(DataInput):
+        pathData = Path(itData)
+        if (len(pathData.stem) == 8) & (pathData.suffix == ".laz"):
+            dt = datetime.datetime.strptime(pathData.stem, "%Y%m%d")
+            Date = np.array(str(dt.strftime("%Y-%m-%d")),dtype="datetime64")
+            ListDate = np.append(ListDate,Date)
+            ListData.append(pathData)
+    ListDate.sort()
+    ListData.sort()
+    dataset = read_laz(ListData[len(ListData) - 1])
+    Range_X = getRange(ListDate)
+    Range_Y = getRange(dataset[2],True) 
+    NLayer = 0
+    config_basemap(config, Range_X[0], Range_X[1], Range_Y[0], Range_Y[1], "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
+    NLayer += 1
+    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, 0.1, "c", "", "", "categorical", [0])
+    NLayer += 1
+    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, 0.16, "c", "", "black", "", [0])
+    NLayer += 1
+    config_text(NLayer, config, True, "Lontitude:   ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
+    NLayer += 1
+    config_text(NLayer, config, True, "Latitude:    ", None, None, "TL", 0.5, -1, "Times-Roman", "10p", "black", "BL", 0)
+    NLayer += 1
+    config_text(NLayer, config, True, "Picked PSs:  ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
 
 def config_generate(Path_config, Type):
     Config = {}
@@ -968,17 +1013,31 @@ def get_GNSS_conf(config, it, InputFile, ListConfig, ListInput):
     ConfigGPS["IO"]["Output"] = ConfigGPS["IO"]["Output"] + "_" + GNSSDataset[0]
     ConfigGPS["IO"]["Input"] = [InputFile]
     Range_X = getRange(np.array(GNSSDataset[2][0],dtype="datetime64"))
+    Edge_Left = 0
+    Edge_Right = 0
+    Edge_Lower = 0
+    Edge_Upper = 0
     for i in range(0,3): 
         NPlot = "Plot" + str(i + 1)
         Range_Y = getRange(np.array(GNSSDataset[2][17 - i],dtype="float") * ConfigGPS[NPlot]["Layer1"]["Ratio"], True)
-        if ConfigGPS[NPlot]["basemap"]["Edge Left"] == 0:
-            ConfigGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
-        if ConfigGPS[NPlot]["basemap"]["Edge Right"] == 0:
-            ConfigGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
-        if ConfigGPS[NPlot]["basemap"]["Edge Lower"] == 0:
-            ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
-        if ConfigGPS[NPlot]["basemap"]["Edge Upper"] == 0:
-            ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
+        if i == 0:
+            if (ConfigGPS[NPlot]["basemap"]["Edge Left"] == 0) and (ConfigGPS[NPlot]["basemap"]["Edge Right"] == 0):
+                ConfigGPS[NPlot]["basemap"]["Edge Left"] = Range_X[0]
+                ConfigGPS[NPlot]["basemap"]["Edge Right"] = Range_X[1]
+            if (ConfigGPS[NPlot]["basemap"]["Edge Lower"] == 0) and (ConfigGPS[NPlot]["basemap"]["Edge Upper"] == 0):
+                ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Range_Y[0]
+                ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Range_Y[1]
+            Edge_Left = ConfigGPS[NPlot]["basemap"]["Edge Left"]
+            Edge_Right = ConfigGPS[NPlot]["basemap"]["Edge Right"]
+            Edge_Lower = ConfigGPS[NPlot]["basemap"]["Edge Lower"]
+            Edge_Upper = ConfigGPS[NPlot]["basemap"]["Edge Upper"]
+        else:
+            if (ConfigGPS[NPlot]["basemap"]["Edge Left"] == 0) and (ConfigGPS[NPlot]["basemap"]["Edge Right"] == 0):
+                ConfigGPS[NPlot]["basemap"]["Edge Left"] = Edge_Left
+                ConfigGPS[NPlot]["basemap"]["Edge Right"] = Edge_Right
+            if (ConfigGPS[NPlot]["basemap"]["Edge Lower"] == 0) and (ConfigGPS[NPlot]["basemap"]["Edge Upper"] == 0):
+                ConfigGPS[NPlot]["basemap"]["Edge Lower"] = Edge_Lower
+                ConfigGPS[NPlot]["basemap"]["Edge Upper"] = Edge_Upper
         for nLayer in ConfigGPS[NPlot]:
             Layer = ConfigGPS[NPlot][nLayer]
             if Layer['Layer'] == "text":
@@ -1074,7 +1133,8 @@ def plot(config):
     if (Batch):
         InputName = Path(Input[0]).stem
         InputName = InputName.replace(Output,"")
-        Output = Output + "_" + InputName
+        if len(InputName) != 0:
+            Output = Output + "_" + InputName
     if not PurePath(Output).is_absolute():
         Output = CurrentPath / Path(Output)
     OutputFormat = "G"
