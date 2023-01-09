@@ -4,6 +4,7 @@ import pygmt
 import laspy
 import math
 import numpy as np
+import geopandas as gpd
 import copy
 import datetime
 import yaml
@@ -703,6 +704,7 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     Input = Layer['File Path']
     TS = Layer['Time Series']
     Value = Layer['Value']
+    NoData = Layer.get('Nodata', None)
     Ratio = Layer['Ratio']
     Size = Layer['Size']
     Type = Layer['Type']
@@ -790,10 +792,57 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     elif len(Fill) != 0:
         CMap = None
     for it in range(0,len(Y)):
-        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
+        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill,nodata=NoData)
         Code.append(f"X={X}")
         Code.append(f"Y={Y[it]}")
         Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
+
+# 繪製向量物件
+def plot_ogr(fig,  Layer, Code=[]):
+    Input = Layer['File Path']
+    Size = Layer['Size']
+    Type = Layer['Type']
+    Pen = Layer['Pen']
+    Fill = Layer['Fill']
+    CMap = Layer['CPT']
+    Series = Layer['CPT Range']
+    if Debug:
+        print(type(Input))
+
+    Input = Path(Input)
+    if Input.suffix != ".shp":
+        print("Input file is not supported.")
+        return
+    if Type != None:
+        if Size == "Data":
+            Style = Type + "c"
+        else:
+            Style = Type + str(Size) + "c"
+            Size = None
+    else:
+        Style = None
+        Size = None
+
+    if len(Pen) ==0:
+        Pen = None
+    
+    if Fill == "cpt":
+        print(f"Fill set to cpt.")
+        if (CMap == "Auto") | (len(CMap) == 0):
+            CMap = "categorical"
+        if Series != [0]:
+            Series = [0]
+        pygmt.makecpt(cmap=CMap, series=Series)
+        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+        CMap = True
+    elif Fill == None:
+        CMap = None
+    elif len(Fill) != 0:
+        CMap = None
+
+    fig.plot(data=Input,style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
+    Code.append(f"Data={Input}")
+    Code.append(f"fig.plot(data=Data,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
 
 def plot_colorbar(
         fig,
@@ -999,7 +1048,7 @@ def get_psts(config, ListConfig, ArrPS, Range = 1):
             if itLayer == "Layer2":
                 Layer["Size"] = Layer["Size"] * 1.5
                 Layer["Fill"] = None
-                Layer["Pen"] = "2p,white"
+                Layer["Pen"] = "1p,white"
             else:
                 Layer["Plot"] = False
         with open(AdditionPlots[0], "w") as f:
@@ -1118,7 +1167,11 @@ def plot(config):
                     if not Layer['Plot']:
                         continue
                     Dataset = 0
-                    plot_xy(fig, Layer, Dataset,Code = Code)
+                    plot_xy(fig, Layer, Dataset, Code = Code)
+                elif Layer['Layer'] == "ogr":
+                    if not Layer['Plot']:
+                        continue
+                    plot_ogr(fig, Layer, Code = Code)
                 elif Layer['Layer'] == "colorbar":
                     if not Layer['Plot']:
                         continue
