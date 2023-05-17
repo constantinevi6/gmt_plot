@@ -527,6 +527,8 @@ def plot_coast(
     ):
     if Water == False:
         arg_water=""
+    else:
+        arg_water="skyblue"
     if Land == True:
         arg_land=""
     if Debug:
