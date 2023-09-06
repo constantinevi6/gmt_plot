@@ -2,7 +2,7 @@
 
 GMT plotting program for PSInSAR result.
 
-Requrement:
+## Requrement:
 
 - [GMT](https://github.com/GenericMappingTools/gmt): Generic Mapping Tools.
 
@@ -18,18 +18,29 @@ Requrement:
 
 - [chardet](https://pypi.org/project/chardet/):Universal encoding detector for Python 2 and 3
 
-簡易安裝方式：
-conda install -c conda-forge matplotlib pyyaml pygmt chardet laspy lazrs-python laszip
+## 安裝方式：
 
-pip install laspy[lazrs,laszip]
+    conda install -c conda-forge matplotlib pyyaml pygmt chardet laspy lazrs-python laszip
 
-===========================Shell script版===========================
+無法正確載入laszip的話請再執行：
+
+    pip install laspy[lazrs,laszip]
+
+***
+
+## Shell script版
+
 使用舊版(Shell script版本)需要以下命令編譯lonlat2m：
 g++ -std=c++11 -o lonlat2m lonlat2m.cpp -I/usr/include/boost169
 
 boost版本請修改至安裝的版本。
+***
 
-Version history:
+## Version history:
+
+- Release Ver. 2.3.1
+  - Fix: 移除不再支援的語法。
+  - Fix: 遮蔽未完成的功能說明。
 
 - Release Ver. 2.3.0
   - Feature: plot image繪圖功能增加無資料值選項。
