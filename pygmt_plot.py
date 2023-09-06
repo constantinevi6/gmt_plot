@@ -129,7 +129,7 @@ def getRange(Dataset, Mirror = False, Fit = False):
             Range_Min = -Range_Max
         return [Range_Min, Range_Max]
 
-def help_info():
+def usage():
     print("")
     print("Support mode:")
     print("    map:  just a simple map.")
@@ -137,11 +137,11 @@ def help_info():
     print("    psv:  map contain mean velocity of PSInSAR.")
     print("    psd:  time series of map contain deformation of PSInSAR.")
     print("    psts: time series of deformation of single PS.")
-    print("    s0:   time series of Sigma naught of single pixel in SAR image stack.")
-    print("    bl:   baseline plot of InSAR image pairs.")
+    # print("    s0:   time series of Sigma naught of single pixel in SAR image stack.")
+    # print("    bl:   baseline plot of InSAR image pairs.")
     print("    gps:  time series of deformation in ENU of single GNSS station.")
-    print("    gpsv: map contain GNSS mean velocity in ENU of single GNSS station.")
-    print("    gpsl: time series of deformation project to SAR LOS of single GNSS station.")
+    # print("    gpsv: map contain GNSS mean velocity in ENU of single GNSS station.")
+    # print("    gpsl: time series of deformation project to SAR LOS of single GNSS station.")
 
 def config_io(config, Type="custom", Batch=False, Layer=[], Input=[], Output="", Format="png", Transparent=True, Width=0, Hight=0, SubPlotX=1, Margins=1, Unit="c", Additional=[]):
     config["IO"] = {
@@ -256,7 +256,7 @@ def config_compass(LayerID, config, Plot=False, Position="LT", Position_Offset_X
         "Y Offset": float(Y_Offset),
         }
 
-def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y=None, Position="TL", Position_Offset_X=0, Position_Offset_Y=0, Font="Times-Roman", FontSize="16p", FontColor="black", Justify="BL", Angle=0, Clearance="", Fill=None, Pen=None, NoClip=False, Transparency=0, Wrap=None, X_Offset=0, Y_Offset=0):
+def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y=None, Position="TL", Position_Offset_X=0, Position_Offset_Y=0, Font="Times-Roman", FontSize="16p", FontColor="black", Justify="BL", Angle=0, Clearance="", Fill=None, Pen=None, NoClip=False, Transparency=0, Wrap=None):
     config["Layer"+str(LayerID)] = {
         "Layer": "text",
         "Plot": Plot,
@@ -277,8 +277,6 @@ def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y
         "NoClip": NoClip,
         "Transparency": Transparency,
         "Wrap": Wrap,
-        "X Offset": float(X_Offset),
-        "Y Offset": float(Y_Offset),
         }
 
 def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0, Position_Offset_Y=0, Length=10, Unit="e", Align="t", X_Offset=1, Y_Offset=1):
@@ -295,7 +293,7 @@ def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0,
         "Y Offset": float(Y_Offset),
         }
 
-def config_profile(LayerID, config, Plot=False, Data_Path="", Vector_Profile=[],):
+def config_profile(LayerID, config, Plot=False, Data_Path="", Vector_Profile=[],TS=False, Value=None, Ratio=1, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
     config["Layer"+str(LayerID)] = {
         "Layer": "profile",
         "Plot": Plot,
@@ -365,7 +363,7 @@ def config_PSTS(config):
     config_text(NLayer, config, True, "Picked PSs:  ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
 
 def config_GNSS(config, NPlot):
-    Color=["blue", "green", "red"]
+    Fill=["blue", "green", "red"]
     YLable=["Heigh (mm)", "Longitude (mm)", "Latitude (mm)"]
     NLayer = 0
     if NPlot == 0:
@@ -373,7 +371,7 @@ def config_GNSS(config, NPlot):
     else:
         config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "Wsen", 0, 0, False, 0, 0, True, "", YLable[NPlot], 0, 8.5)
     NLayer += 1
-    config_xy(NLayer, config, True, "", True, 17 - NPlot, 1000, 0.1, "c", "", Color[NPlot], "", [0])
+    config_xy(NLayer, config, True, "", True, 17 - NPlot, 1000, 0.1, "c", "", Fill[NPlot], "", [0])
     if NPlot == 2:
         NLayer += 1
         config_text(NLayer, config, True, "GNSS Station: ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
@@ -798,10 +796,10 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     elif len(Fill) != 0:
         CMap = None
     for it in range(0,len(Y)):
-        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill,nodata=NoData)
+        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,fill=Fill,nodata=NoData)
         Code.append(f"X={X}")
         Code.append(f"Y={Y[it]}")
-        Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
+        Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",fill=\"{Fill}\")")
 
 # 繪製向量物件
 def plot_ogr(fig,  Layer, Code=[]):
@@ -846,9 +844,9 @@ def plot_ogr(fig,  Layer, Code=[]):
     elif len(Fill) != 0:
         CMap = None
 
-    fig.plot(data=Input,style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
+    fig.plot(data=Input,style=Style,pen=Pen,size=Size,cmap=CMap,fill=Fill)
     Code.append(f"Data={Input}")
-    Code.append(f"fig.plot(data=Data,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
+    Code.append(f"fig.plot(data=Data,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",fill=\"{Fill}\")")
 
 def plot_colorbar(
         fig,
@@ -931,8 +929,6 @@ def plot_text(fig, Layer, Code=[]):
     NoClip= Layer['NoClip']
     Transparency= Layer['Transparency']
     Wrap= Layer['Wrap']
-    Offset_X= Layer['X Offset']
-    Offset_Y= Layer['Y Offset']
 
     if (Position_X != None) and (Position_Y != None):
         Position = None
@@ -942,8 +938,8 @@ def plot_text(fig, Layer, Code=[]):
     Font = FontSize + "," + Font + "," + FontColor
     if len(Clearance) == 0:
         Clearance = None
-    fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap,xshift=Offset_X,yshift=Offset_Y)
-    Code.append(f"fig.text(text=\"{Text}\",x={Position_X},y={Position_Y},position={Position},offset=\"{Offset}\",font=\"{Font}\",justify=\"{Justify}\",angle={Angle},clearance=\"{Clearance}\",fill=\"{Fill}\",pen=\"{Pen}\",no_clip={NoClip},transparency={Transparency},wrap={Wrap},xshift={Offset_X},yshift={Offset_Y})")
+    fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap)
+    Code.append(f"fig.text(text=\"{Text}\",x={Position_X},y={Position_Y},position={Position},offset=\"{Offset}\",font=\"{Font}\",justify=\"{Justify}\",angle={Angle},clearance=\"{Clearance}\",fill=\"{Fill}\",pen=\"{Pen}\",no_clip={NoClip},transparency={Transparency},wrap={Wrap})")
 
 def get_psts(config, ListConfig, ArrPS, Range = 1):
     DataInput = Path(".")
@@ -1235,9 +1231,9 @@ def main():
     config = {}
     setup_yaml()
     if len(sys.argv) < 2:
-        help_info()
+        usage()
     elif sys.argv[1] == "help":
-        help_info()
+        usage()
     else:
         if len(sys.argv) == 2:
             config = config_load(sys.argv[1])
