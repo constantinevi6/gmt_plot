@@ -4,7 +4,6 @@ import pygmt
 import laspy
 import math
 import numpy as np
-import geopandas as gpd
 import copy
 import datetime
 import yaml
@@ -21,7 +20,7 @@ from pathlib import Path
 from pathlib import PurePath
 #from obspy import UTCDateTime
 
-Version = "2.2.0"
+Version = "2.3.0"
 Debug = False
 CurrentPath = Path.cwd()
 
@@ -196,6 +195,7 @@ def config_image(LayerID, config, Plot=True, Data_Path="", Type="Auto", Crop=Tru
         "Output": Output,
         "CPT": CPT,
         "CPT Range": Range,
+        "Nodata": None,
         "Shade": False,
         }
 
@@ -603,6 +603,7 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
     Series = Layer['CPT Range']
     Shade = Layer['Shade']
     Crop = Layer['Crop']
+    NoData = Layer.get('Nodata', None)
     Output = Layer['Output']
     Path_Grd = Path(Input)
     if not os.path.isfile(Path_Grd):
@@ -679,11 +680,14 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
         pygmt.makecpt(cmap=CMap, series=Series)
         Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         CMap = True
+    if NoData is not None:
+        NoData = "+z" + str(NoData)
 
     print("Plotting grd....")
     fig.grdimage(
         grid         = Path_Crop,
         cmap         = CMap,
+        nan_transparent = NoData
     )
     Code.append(f"fig.grdimage(grid=\"{Path_Crop}\",cmap={CMap})")
     if Shade & (Type != "Optical"):
