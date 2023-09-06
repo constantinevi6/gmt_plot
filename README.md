@@ -19,7 +19,7 @@ Requrement:
 - [chardet](https://pypi.org/project/chardet/):Universal encoding detector for Python 2 and 3
 
 簡易安裝方式：
-conda install -c conda-forge matplotlib pyyaml pygmt chardet
+conda install -c conda-forge matplotlib pyyaml pygmt chardet laspy lazrs-python laszip
 
 pip install laspy[lazrs,laszip]
 
@@ -30,22 +30,26 @@ g++ -std=c++11 -o lonlat2m lonlat2m.cpp -I/usr/include/boost169
 boost版本請修改至安裝的版本。
 
 Version history:
-- Release Ver. 2.1.0
-    - Feature: 新增GNSS三軸資料繪圖。
-    - Fix: 修正無限制多執行緒造成電腦當機的問題。
+
+- Release Ver. 2.3.0
+  - Feature: plot image繪圖功能增加無資料值選項。
+
+- Release Ver. 2.2.0
+  - Feature: 新增GNSS三軸資料繪圖。
+  - Fix: 修正無限制多執行緒造成電腦當機的問題。
 
 - Release Ver. 2.1.0
-    - Feature: 重新設計IO。
-    - Feature: 重新定義多圖繪製。
-    - Feature: 強化散佈圖繪製功能。
-    - Feature: 新增通用型批次繪圖設定選項。
-    - Fix: 修正多執行緒重複執行主執行緒的問題。
-    
+  - Feature: 重新設計IO。
+  - Feature: 重新定義多圖繪製。
+  - Feature: 強化散佈圖繪製功能。
+  - Feature: 新增通用型批次繪圖設定選項。
+  - Fix: 修正多執行緒重複執行主執行緒的問題。
+
 - Release Ver. 2.0.1
-    - Feature: 支援輸入獨立檔案之時間序列繪圖。
+  - Feature: 支援輸入獨立檔案之時間序列繪圖。
 
 - Release Ver. 2.0.0
-    - Feature: 新增pygmt版本，支援速度場、時間序列繪圖。
+  - Feature: 新增pygmt版本，支援速度場、時間序列繪圖。
 
 - Release Ver. 1.0.0
-    - Feature: Shell script版本，支援速度場、時間序列、GPS三維時序繪圖。
+  - Feature: Shell script版本，支援速度場、時間序列、GPS三維時序繪圖。
