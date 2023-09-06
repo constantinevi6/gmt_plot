@@ -20,7 +20,7 @@ from pathlib import Path
 from pathlib import PurePath
 #from obspy import UTCDateTime
 
-Version = "2.3.0"
+Version = "2.3.1"
 Debug = False
 CurrentPath = Path.cwd()
 
