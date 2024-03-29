@@ -199,7 +199,7 @@ def config_image(LayerID, config, Plot=True, Data_Path="", Type="Auto", Crop=Tru
         "Shade": False,
         }
 
-def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
+def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Reference=None, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
     config["Layer"+str(LayerID)] = {
         "Layer": "psxy",
         "Plot": Plot,
@@ -207,6 +207,7 @@ def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Rat
         "Time Series": TS,
         "Value": Value,
         "Ratio": Ratio,
+        "Reference": Reference,
         "Size": float(Size),
         "Type": Type,
         "Pen": Pen,
@@ -323,7 +324,7 @@ def config_PSV(config, Input=""):
     NLayer += 1
     config_image(NLayer, config)
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, False, None, 1, 0.02, "c", "", "cpt", "jet", CPT_Range)
+    config_xy(NLayer, config, True, DataInput, False, None, 1, None, 0.02, "c", "", "cpt", "jet", CPT_Range)
     Link = NLayer
     NLayer += 1
     config_colorbar(NLayer, config, True, Link, "TL", 0.5, 0.5, 6, 0.5, "c", "TL", "v", 1, -1, "LOS Velocity (mm/year)", max(CPT_Range), 10)
@@ -352,9 +353,9 @@ def config_PSTS(config):
     NLayer = 0
     config_basemap(config, Range_X[0], Range_X[1], Range_Y[0], Range_Y[1], "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
     NLayer += 1
-    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, 0.1, "c", "", "", "categorical", [0])
+    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, None, 0.1, "c", "", "", "categorical", [0])
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, 0.16, "c", "", "black", "", [0])
+    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, None, 0.16, "c", "", "black", "", [0])
     NLayer += 1
     config_text(NLayer, config, True, "Lontitude:   ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
     NLayer += 1
@@ -710,6 +711,7 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     Value = Layer['Value']
     NoData = Layer.get('Nodata', None)
     Ratio = Layer['Ratio']
+    Reference = Layer.get('Reference', None)
     Size = Layer['Size']
     Type = Layer['Type']
     Pen = Layer['Pen']
@@ -756,12 +758,26 @@ def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
         Y = np.array([dataset[Value]],dtype="float")
     Y = Ratio * Y
     
+    if Reference == None:
+        Y = Y
+    elif Reference == "First":
+        Y = Y - Y[0]
+    elif Reference == "Mean":
+        Y = Y - Y.mean()
+    else:
+        Offset = 0
+        try:
+            Offset = float(Reference)
+        except ValueError:
+            Offset = 0
+        Y = Y - Offset
+
     if len(dataset) < 3:
         Z = np.zeros(X.size)
     elif Value == "Isolate":
         Z = np.arange(len(dataset)-1)
     else:
-        Z = np.array(dataset[2])
+        Z = np.array(dataset[2],dtype="float")
 
     if Type != None:   
         if Size == "Data":
@@ -814,9 +830,6 @@ def plot_ogr(fig,  Layer, Code=[]):
         print(type(Input))
 
     Input = Path(Input)
-    if Input.suffix != ".shp":
-        print("Input file is not supported.")
-        return
     if Type != None:
         if Size == "Data":
             Style = Type + "c"
@@ -1179,6 +1192,8 @@ def plot(config):
                         continue
                     plot_colorbar(fig, Layer, Plot[Layer['Link']],Code = Code)
                 elif Layer['Layer'] == "text":
+                    if not Layer['Plot']:
+                        continue
                     plot_text(fig, Layer,Code = Code)
 
             plot_Frame(fig, Plot['basemap'],Code = Code)
