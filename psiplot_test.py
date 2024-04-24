@@ -4,6 +4,7 @@ import pygmt
 import laspy
 import math
 import numpy as np
+import geopandas as gpd
 import copy
 import datetime
 import yaml
@@ -20,8 +21,8 @@ from pathlib import Path
 from pathlib import PurePath
 #from obspy import UTCDateTime
 
-Version = "2.4.0"
-Debug = False
+Version = "2.2.0"
+Debug = True
 CurrentPath = Path.cwd()
 
 def represent_dictionary_order(self, dict_data):
@@ -129,7 +130,7 @@ def getRange(Dataset, Mirror = False, Fit = False):
             Range_Min = -Range_Max
         return [Range_Min, Range_Max]
 
-def usage():
+def help_info():
     print("")
     print("Support mode:")
     print("    map:  just a simple map.")
@@ -137,11 +138,11 @@ def usage():
     print("    psv:  map contain mean velocity of PSInSAR.")
     print("    psd:  time series of map contain deformation of PSInSAR.")
     print("    psts: time series of deformation of single PS.")
-    # print("    s0:   time series of Sigma naught of single pixel in SAR image stack.")
-    # print("    bl:   baseline plot of InSAR image pairs.")
+    print("    s0:   time series of Sigma naught of single pixel in SAR image stack.")
+    print("    bl:   baseline plot of InSAR image pairs.")
     print("    gps:  time series of deformation in ENU of single GNSS station.")
-    # print("    gpsv: map contain GNSS mean velocity in ENU of single GNSS station.")
-    # print("    gpsl: time series of deformation project to SAR LOS of single GNSS station.")
+    print("    gpsv: map contain GNSS mean velocity in ENU of single GNSS station.")
+    print("    gpsl: time series of deformation project to SAR LOS of single GNSS station.")
 
 def config_io(config, Type="custom", Batch=False, Layer=[], Input=[], Output="", Format="png", Transparent=True, Width=0, Hight=0, SubPlotX=1, Margins=1, Unit="c", Additional=[]):
     config["IO"] = {
@@ -173,7 +174,6 @@ def config_basemap(config, Left=0, Right=0, Lower=0, Upper=0, Projection="X", Wi
         "Map Unit": Unit,
         "Map Frame Style": FrameStyle,
         "Map Frame": Frame,
-        "Map Frame Tick": True,
         "Map X Label": X_Label,
         "Map Y Label": Y_Label,
         "Map Bax": float(Bax),
@@ -196,11 +196,10 @@ def config_image(LayerID, config, Plot=True, Data_Path="", Type="Auto", Crop=Tru
         "Output": Output,
         "CPT": CPT,
         "CPT Range": Range,
-        "Nodata": None,
         "Shade": False,
         }
 
-def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Reference=None, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
+def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
     config["Layer"+str(LayerID)] = {
         "Layer": "psxy",
         "Plot": Plot,
@@ -208,7 +207,6 @@ def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Rat
         "Time Series": TS,
         "Value": Value,
         "Ratio": Ratio,
-        "Reference": Reference,
         "Size": float(Size),
         "Type": Type,
         "Pen": Pen,
@@ -217,18 +215,6 @@ def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Rat
         "CPT Range": Range,
         }
 
-def config_ogr(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Reference=None, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
-    config["Layer"+str(LayerID)] = {
-        "Layer": "ogr",
-        "Plot": Plot,
-        "File Path": str(Data_Path),
-        "Type": Type,
-        "Pen": Pen,
-        "Fill": Fill,
-        "CPT": CPT,
-        "CPT Range": Range,
-        }
-    
 def config_colorbar(LayerID, config, Plot=True, Link=0, Position="BC", Position_Offset_X=0, Position_Offset_Y=0, Width=10, Hight=0.5, Unit="c", Anchor="TC", Direction="h", X_Offset=0, Y_Offset=0, Label="", Ba=50, Bf=10, BoxColor="white", BoxTrans=30, CPT="jet", CPT_Range=[0]):
     if Link != 0:
         CPT = config["Layer"+str(Link)]["CPT"]
@@ -270,7 +256,7 @@ def config_compass(LayerID, config, Plot=False, Position="LT", Position_Offset_X
         "Y Offset": float(Y_Offset),
         }
 
-def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y=None, Position="TL", Position_Offset_X=0, Position_Offset_Y=0, Font="Times-Roman", FontSize="16p", FontColor="black", Justify="BL", Angle=0, Clearance="", Fill=None, Pen=None, NoClip=False, Transparency=0, Wrap=None):
+def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y=None, Position="TL", Position_Offset_X=0, Position_Offset_Y=0, Font="Times-Roman", FontSize="16p", FontColor="black", Justify="BL", Angle=0, Clearance="", Fill=None, Pen=None, NoClip=False, Transparency=0, Wrap=None, X_Offset=0, Y_Offset=0):
     config["Layer"+str(LayerID)] = {
         "Layer": "text",
         "Plot": Plot,
@@ -291,25 +277,25 @@ def config_text(LayerID, config, Plot=True, Text="", Position_X=None, Position_Y
         "NoClip": NoClip,
         "Transparency": Transparency,
         "Wrap": Wrap,
+        "X Offset": float(X_Offset),
+        "Y Offset": float(Y_Offset),
         }
 
-def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0, Position_Offset_Y=0, Anchor="RB", Length=10, Unit="e", Align="t", Fancy = True, X_Offset=1, Y_Offset=1):
+def config_scale(LayerID, config, Plot=True, Position="RB", Position_Offset_X=0, Position_Offset_Y=0, Length=10, Unit="e", Align="t", X_Offset=1, Y_Offset=1):
     config["Layer"+str(LayerID)] = {
         "Layer": "scale",
         "Plot": Plot,
         "Position": Position,
         "Position X Offset": Position_Offset_X,
         "Position Y Offset": Position_Offset_Y,
-        "Anchor": Anchor,
         "Length": float(Length),
         "Unit": Unit,
         "Align": Align,
-        "Fancy": Fancy,
         "X Offset": float(X_Offset),
         "Y Offset": float(Y_Offset),
         }
 
-def config_profile(LayerID, config, Plot=False, Data_Path="", Vector_Profile=[],TS=False, Value=None, Ratio=1, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
+def config_profile(LayerID, config, Plot=False, Data_Path="", Vector_Profile=[],):
     config["Layer"+str(LayerID)] = {
         "Layer": "profile",
         "Plot": Plot,
@@ -339,14 +325,14 @@ def config_PSV(config, Input=""):
     NLayer += 1
     config_image(NLayer, config)
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, False, None, 1, None, 0.02, "c", "", "cpt", "jet", CPT_Range)
+    config_xy(NLayer, config, True, DataInput, False, None, 1, 0.02, "c", "", "cpt", "jet", CPT_Range)
     Link = NLayer
     NLayer += 1
     config_colorbar(NLayer, config, True, Link, "TL", 0.5, 0.5, 6, 0.5, "c", "TL", "v", 1, -1, "LOS Velocity (mm/year)", max(CPT_Range), 10)
     NLayer += 1
     config_compass(NLayer, config, True, "LT", 0.5, 0.5, 1, 0, "c", 0, 0)
     NLayer += 1
-    config_scale(NLayer, config, True, "RB", 0.5, 0.5, "RB", 10, "e", "t", 0, 0)
+    config_scale(NLayer, config, True, "RB", 0.5, 0.5, 10, "e", "t", 0, 0)
     NLayer += 1
 
 def config_PSTS(config):
@@ -368,9 +354,9 @@ def config_PSTS(config):
     NLayer = 0
     config_basemap(config, Range_X[0], Range_X[1], Range_Y[0], Range_Y[1], "X", 18, 8, "c", "plain", "WSen", 0, 0, False, 0, 10, True, "Time", "LOS Displacement(mm)")
     NLayer += 1
-    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, None, 0.1, "c", "", "", "categorical", [0])
+    config_xy(NLayer, config, False, DataInput, True, "Isolate", 1, 0.1, "c", "", "", "categorical", [0])
     NLayer += 1
-    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, None, 0.16, "c", "", "black", "", [0])
+    config_xy(NLayer, config, True, DataInput, True, "Mean", 1, 0.16, "c", "", "black", "", [0])
     NLayer += 1
     config_text(NLayer, config, True, "Lontitude:   ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
     NLayer += 1
@@ -379,7 +365,7 @@ def config_PSTS(config):
     config_text(NLayer, config, True, "Picked PSs:  ", None, None, "TL", 0.5, -1.5, "Times-Roman", "10p", "black", "BL", 0)
 
 def config_GNSS(config, NPlot):
-    Fill=["blue", "green", "red"]
+    Color=["blue", "green", "red"]
     YLable=["Heigh (mm)", "Longitude (mm)", "Latitude (mm)"]
     NLayer = 0
     if NPlot == 0:
@@ -387,7 +373,7 @@ def config_GNSS(config, NPlot):
     else:
         config_basemap(config, 0, 0, -0, 0, "X", 18, 8, "c", "plain", "Wsen", 0, 0, False, 0, 0, True, "", YLable[NPlot], 0, 8.5)
     NLayer += 1
-    config_xy(NLayer, config, True, "", True, 17 - NPlot, 1000, 0.1, "c", "", Fill[NPlot], "", [0])
+    config_xy(NLayer, config, True, "", True, 17 - NPlot, 1000, 0.1, "c", "", Color[NPlot], "", [0])
     if NPlot == 2:
         NLayer += 1
         config_text(NLayer, config, True, "GNSS Station: ", None, None, "TL", 0.5, -0.5, "Times-Roman", "10p", "black", "BL", 0)
@@ -461,10 +447,9 @@ def config_generate(Path_config, Type):
         config_basemap(Plot)
         config_image(1, Plot)
         config_xy(2, Plot)
-        config_ogr(3, Plot)
-        config_colorbar(4, Plot)
-        config_compass(5, Plot)
-        config_scale(6, Plot)
+        config_colorbar(3, Plot)
+        config_compass(4, Plot)
+        config_scale(5, Plot)
         Config["Plot1"] = Plot
         
     print(f"Please setup {Path_config} for input.")
@@ -473,7 +458,7 @@ def config_generate(Path_config, Type):
         yaml.dump(Config, f, Dumper=yaml.CDumper, sort_keys=False)
 
 def config_load(Type="", Path_config=""):
-    ListType = ["map", "ts", "psv", "psd", "psts", "s0", "bl", "gps", "gpsv", "gpsl", "shp", "custom"]
+    ListType = ["map", "ts", "psv", "psd", "psts", "s0", "bl", "gps", "gpsv", "gpsl", "custom"]
     Config = {}
     if Type in ListType:
         if Path_config == "":
@@ -528,8 +513,8 @@ def plot_basemap(fig, Layer, Offset_X=0, Offset_Y=0, Code=[]):
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle):
         fig.basemap(region=Region, projection=Projection, frame=Frame, transparency=Transparency)
 
-    Code.append(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\"")
-    Code.append(f"    fig.basemap(region={Region}, projection=\"{Projection}\", frame={Frame}, transparency={Transparency})")
+    print(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\"")
+    print(f"    fig.basemap(region={Region}, projection=\"{Projection}\", frame={Frame}, transparency={Transparency})")
 
 # 繪製海岸線
 def plot_coast(
@@ -552,11 +537,10 @@ def plot_coast(
         grid       = Input,
         cmap       = True
     )
-    Code.append(f"fig.coast(grid=\"{Input}\",cmap=True)")
+    print(f"fig.coast(grid=\"{Input}\",cmap=True)")
 
 # 繪製地圖框線
 def plot_Frame(fig, Layer, Code=[]):
-    FrameTick = Layer.get('Map Frame Tick', True)
     FrameStyle = Layer['Map Frame Style']
     Frame = Layer['Map Frame']
     X_Label = Layer['Map X Label']
@@ -587,6 +571,7 @@ def plot_Frame(fig, Layer, Code=[]):
     Frame_X = "xa" + Bax + "f" + Bxg + Bfx
     if len(X_Label) != 0:
         Frame_X = Frame_X + "+l" + "\"" + X_Label + "\""
+    Frame.append(Frame_X)
 
     if Bay != 0:
         Bay=str(Bay)
@@ -604,14 +589,11 @@ def plot_Frame(fig, Layer, Code=[]):
 
     if len(Y_Label) != 0:
         Frame_Y = Frame_Y + "+l" + "\"" + Y_Label + "\""
-
-    if FrameTick:
-        Frame.append(Frame_X)
-        Frame.append(Frame_Y)
+    Frame.append(Frame_Y)
     with pygmt.config(MAP_FRAME_TYPE=FrameStyle, FORMAT_GEO_MAP="ddd.xxF"):
         fig.basemap(frame=Frame)
-    Code.append(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\", FORMAT_GEO_MAP=\"ddd.xxF\"):")
-    Code.append(f"    fig.basemap(frame={Frame})")
+    print(f"with pygmt.config(MAP_FRAME_TYPE=\"{FrameStyle}\", FORMAT_GEO_MAP=\"ddd.xxF\"):")
+    print(f"    fig.basemap(frame={Frame})")
 
 # 繪製網格物件
 def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
@@ -621,7 +603,6 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
     Series = Layer['CPT Range']
     Shade = Layer['Shade']
     Crop = Layer['Crop']
-    NoData = Layer.get('Nodata', None)
     Output = Layer['Output']
     Path_Grd = Path(Input)
     if not os.path.isfile(Path_Grd):
@@ -658,7 +639,7 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
         print(f"Starting crop file {Path_Grd} to {Path_Crop}....")
         gdalcmd = f"gdal_translate -projwin {Left} {Upper} {Right} {Lower} -of GTiff {Path_Grd} {Path_Crop}"
         os.system(gdalcmd)
-        Code.append(f"os.system(\"{gdalcmd}\")")
+        print(f"os.system(\"{gdalcmd}\")")
     else:
         Path_Crop = Path_Grd
 
@@ -696,18 +677,16 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
             Series = [stats[0], stats[1], Interval]
             
         pygmt.makecpt(cmap=CMap, series=Series)
-        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+        print(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         CMap = True
-    if NoData is not None:
-        NoData = "+z" + str(NoData)
 
     print("Plotting grd....")
     fig.grdimage(
         grid         = Path_Crop,
         cmap         = CMap,
-        nan_transparent = NoData
+        nan_transparent="+z0"
     )
-    Code.append(f"fig.grdimage(grid=\"{Path_Crop}\",cmap={CMap})")
+    print(f"fig.grdimage(grid=\"{Path_Crop}\",cmap={CMap})")
     if Shade & (Type != "Optical"):
         print("Starting plot shade....")
         Grd_Shade = pygmt.grdgradient(grid=Path_Crop, radiance=[270, 30])
@@ -718,19 +697,19 @@ def plot_img(fig, Layer, Left, Right, Lower, Upper, Code=[]):
             transparency = 50,
         )
         Grd_Shade.close()
-        Code.append(f"Grd_Shade = pygmt.grdgradient(grid=\"{Path_Crop}\", radiance=[270, 30])")
-        Code.append(f"pygmt.makecpt(cmap=\"gray\", series=[-1.5, 0.3, 0.01])")
-        Code.append(f"fig.grdimage(grid=Grd_Shade,cmap=True,transparency=50)")
-        Code.append(f"Grd_Shade.close()")
+        # print(f"Grd_Shade = pygmt.grdgradient(grid=\"{Path_Crop}\", radiance=[270, 30])")
+        # print(f"pygmt.makecpt(cmap=\"gray\", series=[-1.5, 0.3, 0.01])")
+        # print(f"fig.grdimage(grid=Grd_Shade,cmap=True,transparency=50)")
+        # print(f"Grd_Shade.close()")
+    return 0
 
 # 繪製向量物件
-def plot_xy(fig, Layer, Dataset = 0, Code=[]):
+def plot_xy(fig,  Layer, Dataset = 0, Code=[]):
     Input = Layer['File Path']
     TS = Layer['Time Series']
     Value = Layer['Value']
     NoData = Layer.get('Nodata', None)
     Ratio = Layer['Ratio']
-    Reference = Layer.get('Reference', None)
     Size = Layer['Size']
     Type = Layer['Type']
     Pen = Layer['Pen']
@@ -777,26 +756,12 @@ def plot_xy(fig, Layer, Dataset = 0, Code=[]):
         Y = np.array([dataset[Value]],dtype="float")
     Y = Ratio * Y
     
-    if Reference == None:
-        Y = Y
-    elif Reference == "First":
-        Y = Y - Y[0]
-    elif Reference == "Mean":
-        Y = Y - Y.mean()
-    else:
-        Offset = 0
-        try:
-            Offset = float(Reference)
-        except ValueError:
-            Offset = 0
-        Y = Y - Offset
-
     if len(dataset) < 3:
         Z = np.zeros(X.size)
     elif Value == "Isolate":
         Z = np.arange(len(dataset)-1)
     else:
-        Z = np.array(dataset[2],dtype="float")
+        Z = np.array(dataset[2])
 
     if Type != None:   
         if Size == "Data":
@@ -823,7 +788,7 @@ def plot_xy(fig, Layer, Dataset = 0, Code=[]):
             Interval = (max(Z) - min(Z)) / 100
             Series = [min(Z), max(Z), Interval]
         pygmt.makecpt(cmap=CMap, series=Series)
-        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+        print(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         Fill = Z
         CMap = True
     elif Fill == None:
@@ -831,13 +796,13 @@ def plot_xy(fig, Layer, Dataset = 0, Code=[]):
     elif len(Fill) != 0:
         CMap = None
     for it in range(0,len(Y)):
-        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,fill=Fill,nodata=NoData)
-        Code.append(f"X={X}")
-        Code.append(f"Y={Y[it]}")
-        Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",fill=\"{Fill}\")")
+        fig.plot(x=X,y=Y[it],style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill,nodata=NoData)
+        print(f"X={X}")
+        print(f"Y={Y[it]}")
+        print(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
 
 # 繪製向量物件
-def plot_ogr(fig, Layer, Code=[]):
+def plot_ogr(fig,  Layer, Code=[]):
     Input = Layer['File Path']
     Size = Layer['Size']
     Type = Layer['Type']
@@ -849,6 +814,9 @@ def plot_ogr(fig, Layer, Code=[]):
         print(type(Input))
 
     Input = Path(Input)
+    if Input.suffix != ".shp":
+        print("Input file is not supported.")
+        return
     if Type != None:
         if Size == "Data":
             Style = Type + "c"
@@ -869,16 +837,16 @@ def plot_ogr(fig, Layer, Code=[]):
         if Series != [0]:
             Series = [0]
         pygmt.makecpt(cmap=CMap, series=Series)
-        Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+        print(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
         CMap = True
     elif Fill == None:
         CMap = None
     elif len(Fill) != 0:
         CMap = None
 
-    fig.plot(data=Input,style=Style,pen=Pen,size=Size,cmap=CMap,fill=Fill)
-    Code.append(f"Data={Input}")
-    Code.append(f"fig.plot(data=Data,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",fill=\"{Fill}\")")
+    fig.plot(data=Input,style=Style,pen=Pen,size=Size,cmap=CMap,color=Fill)
+    print(f"Data={Input}")
+    print(f"fig.plot(data=Data,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",color=\"{Fill}\")")
 
 def plot_colorbar(
         fig,
@@ -940,8 +908,8 @@ def plot_colorbar(
         cmap     = True,
         box      = Box
     )
-    Code.append(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
-    Code.append(f"fig.colorbar(position=\"{Position}\",frame={Frame},cmap=True,box=\"{Box}\")")
+    print(f"pygmt.makecpt(cmap=\"{CMap}\", series={Series})")
+    print(f"fig.colorbar(position=\"{Position}\",frame={Frame},cmap=True,box=\"{Box}\")")
 
 def plot_text(fig, Layer, Code=[]):
     Text = Layer['Text']
@@ -961,6 +929,8 @@ def plot_text(fig, Layer, Code=[]):
     NoClip= Layer['NoClip']
     Transparency= Layer['Transparency']
     Wrap= Layer['Wrap']
+    Offset_X= Layer['X Offset']
+    Offset_Y= Layer['Y Offset']
 
     if (Position_X != None) and (Position_Y != None):
         Position = None
@@ -970,83 +940,8 @@ def plot_text(fig, Layer, Code=[]):
     Font = FontSize + "," + Font + "," + FontColor
     if len(Clearance) == 0:
         Clearance = None
-    fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap)
-    Code.append(f"fig.text(text=\"{Text}\",x={Position_X},y={Position_Y},position={Position},offset=\"{Offset}\",font=\"{Font}\",justify=\"{Justify}\",angle={Angle},clearance=\"{Clearance}\",fill=\"{Fill}\",pen=\"{Pen}\",no_clip={NoClip},transparency={Transparency},wrap={Wrap})")
-
-def plot_scale(fig, Layer, Basemap, Code=[]):
-    Left = Basemap['Edge Left']
-    Right = Basemap['Edge Right']
-    Lower = Basemap['Edge Lower']
-    Upper = Basemap['Edge Upper']
-    Projection = Basemap['Projection']
-    Width = Basemap['Map Width']
-    Hight = Basemap['Map Hight']
-    Unit = Basemap['Map Unit']
-    FrameStyle="plain"
-    Frame="wsen"
-
-    Position = Layer.get("Position", "RB")
-    Position_X_Offset = Layer.get("Position X Offset", 1)
-    Position_Y_Offset = Layer.get("Position Y Offset", -1)
-    Anchor = Layer.get("Anchor", "RB")
-    Length = Layer.get("Length", 10)
-    ScaleUnit = Layer.get("Unit", "e")
-    Align = Layer.get("Align", "t")
-    Fancy = Layer.get("Fancy", True)
-    Color = Layer.get("Pen", "black")
-    Pen = Layer.get("Pen", "0.25p")
-    Font = Layer.get("Font", "11p")
-    Box = Layer.get("Box", False)
-    BoxFill = Layer.get("Box Fill", "white")
-    BoxPen = Layer.get("Box Pen", None)
-    Ygap = Layer.get("Y Gap", 0)
-    Xgap = Layer.get("X Gap", 0)
-    Rounded = Layer.get("Rounded", 0)
-    Shade = Layer.get("Shade", None)
-    MapScale = None
-    Transparency = 50
-
-    if len(Position) == 0:
-        Position = "BR"
-
-    if Position[1] == "R":
-        Position_X_Offset = Position_X_Offset + 2
-
-    MapScale = "j" + Position + "+w" + str(Length) + ScaleUnit + "+a" + Align
-    MapScale = MapScale + "+o" + str(Position_X_Offset) + Unit
-    MapScale = MapScale + "/" + str(Position_Y_Offset) + Unit
-    MapScale = MapScale + "+j" + Anchor
-
-    if Fancy:
-        MapScale = MapScale + "+f"
-        
-    ConfigBox = None
-    if Box:
-        ConfigBox = ""
-        if BoxPen is not None:
-            ConfigBox = ConfigBox + "+p" + BoxPen
-        if BoxFill is not None:
-            ConfigBox = ConfigBox + "+g" + BoxFill
-        if (Xgap != 0) or (Ygap != 0):
-            ConfigBox = ConfigBox + "+c" + str(Xgap) + "/" + str(Ygap)
-        if Rounded != 0:
-            ConfigBox = ConfigBox + "+r" + str(Rounded )+ "p"
-        if Shade is not None:
-            ConfigBox = ConfigBox + "+s" + Shade
-    if Color is None:
-        Font = "black"
-    if Font is None:
-        Font = "11p"
-    if Pen is None:
-        Pen = "0.25p"
-    PenFont = Font + "," + Color
-    PenFrame = Pen + "," + Color
-    with pygmt.config(MAP_TICK_PEN=PenFrame, MAP_GRID_PEN=PenFrame, MAP_FRAME_PEN=PenFrame, FONT_ANNOT_PRIMARY=PenFont):
-        fig.basemap(map_scale=MapScale, box=ConfigBox, transparency=Transparency)
-    with pygmt.config(MAP_TICK_PEN=PenFrame, MAP_GRID_PEN=PenFrame, MAP_FRAME_PEN=PenFrame, FONT_ANNOT_PRIMARY=PenFont):
-        fig.basemap(map_scale=MapScale)
-
-    Code.append(f"fig.basemap(map_scale={MapScale})")
+    fig.text(text=Text,x=Position_X,y=Position_Y,position=Position,offset=Offset,font=Font,justify=Justify,angle=Angle,clearance=Clearance,fill=Fill,pen=Pen,no_clip=NoClip,transparency=Transparency,wrap=Wrap,xshift=Offset_X,yshift=Offset_Y)
+    print(f"fig.text(text=\"{Text}\",x={Position_X},y={Position_Y},position={Position},offset=\"{Offset}\",font=\"{Font}\",justify=\"{Justify}\",angle={Angle},clearance=\"{Clearance}\",fill=\"{Fill}\",pen=\"{Pen}\",no_clip={NoClip},transparency={Transparency},wrap={Wrap},xshift={Offset_X},yshift={Offset_Y})")
 
 def get_psts(config, ListConfig, ArrPS, Range = 1):
     DataInput = Path(".")
@@ -1241,9 +1136,8 @@ def plot(config):
     NPlot = len(Input)
     if (NPlot == 0):
         NPlot = 1
-    pygmt._begin()
     fig = pygmt.Figure()
-    Code.append("fig = pygmt.Figure()")
+    print("fig = pygmt.Figure()")
     pygmt.config(FONT="Times-Roman")
     if Type == "psts":
         pygmt.config(MAP_GRID_PEN_PRIMARY="thinnest,-")
@@ -1262,34 +1156,38 @@ def plot(config):
             plot_basemap(fig, Plot['basemap'],Code = Code)
             for iLayer in Plot:
                 Layer = Plot[iLayer]
+                LayerName = Plot[iLayer]["Layer"]
                 if iLayer in config["IO"]["Layer"]:
                     Path_File = config["IO"]["Input"][it]
                     if not PurePath(Path_File).is_absolute():
                         Path_File = CurrentPath / Path_File
                     Layer["File Path"] = Path_File
 
-                if not Layer.get("Plot", False):
-                    continue
                 if Layer['Layer'] == "grdimage":
+                    if not Layer['Plot']:
+                        continue
                     plot_img(fig, Layer, Plot["basemap"]["Edge Left"], Plot["basemap"]["Edge Right"], Plot["basemap"]["Edge Lower"], Plot["basemap"]["Edge Upper"],Code = Code)
                 elif Layer['Layer'] == "psxy":
+                    if not Layer['Plot']:
+                        continue
                     Dataset = 0
                     plot_xy(fig, Layer, Dataset, Code = Code)
                 elif Layer['Layer'] == "ogr":
+                    if not Layer['Plot']:
+                        continue
                     plot_ogr(fig, Layer, Code = Code)
                 elif Layer['Layer'] == "colorbar":
+                    if not Layer['Plot']:
+                        continue
                     plot_colorbar(fig, Layer, Plot[Layer['Link']],Code = Code)
                 elif Layer['Layer'] == "text":
                     plot_text(fig, Layer,Code = Code)
-                elif Layer['Layer'] == "scale":
-                    plot_scale(fig, Layer, Plot['basemap'], Code = Code)
-
             plot_Frame(fig, Plot['basemap'],Code = Code)
 
         ShiftX = str(ShiftX) + MarginsUnit
         ShiftY = str(ShiftY) + MarginsUnit
         fig.shift_origin(xshift=ShiftX,yshift=ShiftY)
-        Code.append(f"fig.shift_origin(xshift=\"{ShiftX}\",yshift=\"{ShiftY}\")")
+        print(f"fig.shift_origin(xshift=\"{ShiftX}\",yshift=\"{ShiftY}\")")
     # fig.show()
     InputName = ""
     if (Batch):
@@ -1301,7 +1199,7 @@ def plot(config):
         Output = CurrentPath / Path(Output)
     OutputFormat = "G"
     fig.psconvert(prefix=Output, fmt=OutputFormat, crop=True)
-    Code.append(f"fig.psconvert(prefix=\"{Output}\", fmt=\"{OutputFormat}\", crop=True)")
+    print(f"fig.psconvert(prefix=\"{Output}\", fmt=\"{OutputFormat}\", crop=True)")
     # Output = Output + "." + config['IO']['Format']
     # fig.savefig(Output, transparent=config['IO']['Transparent'])
     # for AdditionPlot in AdditionPlots:
@@ -1309,7 +1207,6 @@ def plot(config):
     #     ConfigAddPlot['IO']['Output'] = ConfigAddPlot['IO']['Output'] + "_" + InputName
     #     plot(ConfigAddPlot)
     codedemo(Code)
-    pygmt._end()
 
 def parallelTask(ListTask):
     CPUs = multiprocessing.cpu_count()
@@ -1334,9 +1231,9 @@ def main():
     config = {}
     setup_yaml()
     if len(sys.argv) < 2:
-        usage()
+        help_info()
     elif sys.argv[1] == "help":
-        usage()
+        help_info()
     else:
         if len(sys.argv) == 2:
             config = config_load(sys.argv[1])
@@ -1396,12 +1293,7 @@ def main():
     for it in range(0,len(ListInput)):
         itConfig = ListConfig[it]
         itConfig["IO"]["Input"] = ListInput[it]
-        ListArgs.append((itConfig,))
-        # ListTask.append(multiprocessing.Process(target=plot, args=(itConfig,)))
-    parallelPool(plot, ListArgs, Threads)
-    # parallelTask(ListTask)
-    # for Task in ListTask:
-    #     Task.join()
+        plot(itConfig)
 
 # Main
 if __name__=='__main__':

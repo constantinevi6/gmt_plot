@@ -2,7 +2,7 @@
 
 GMT plotting program for PSInSAR result.
 
-## Requrement:
+## Requirement
 
 - [GMT](https://github.com/GenericMappingTools/gmt): Generic Mapping Tools.
 
@@ -16,7 +16,7 @@ GMT plotting program for PSInSAR result.
 
 - [pyyaml](https://pyyaml.org): PyYAML is a full-featured YAML framework for the Python programming language.
 
-- [chardet](https://pypi.org/project/chardet/):Universal encoding detector for Python 2 and 3
+- [chardet](https://pypi.org/project/chardet/): Universal encoding detector for Python 2 and 3
 
 ## 安裝方式：
 
@@ -36,7 +36,12 @@ g++ -std=c++11 -o lonlat2m lonlat2m.cpp -I/usr/include/boost169
 boost版本請修改至安裝的版本。
 ***
 
-## Version history:
+## Version History
+
+- Release Ver. 2.4.0
+  - Feature: plot xy繪圖功能增加調整參考點選項。
+  - Feature: plot ogr向量繪圖功能。
+  - Feature: plot scale比例尺繪圖功能。
 
 - Release Ver. 2.3.1
   - Fix: 移除不再支援的語法。

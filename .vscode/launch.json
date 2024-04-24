@@ -6,8 +6,8 @@
             "type": "python",
             "request": "launch",
             "program": "${file}",
-            "args": ["pygmt_config_gps.yml", "1200.ncu.final_igb14.pos","ANK2.ncu.final_igb14.pos","BANP.ncu.final_igb14.pos","YULI.ncu.final_igb14.pos","ZUZH.ncu.final_igb14.pos","1211.ncu.final_igb14.pos","ANKN.ncu.final_igb14.pos","BEG2.ncu.final_igb14.pos","YWJS.ncu.final_igb14.pos","ANBU.ncu.final_igb14.pos","BAL2.ncu.final_igb14.pos","BIMO.ncu.final_igb14.pos","ZCRS.ncu.final_igb14.pos","ANES.ncu.final_igb14.pos","BALN.ncu.final_igb14.pos","BK01.ncu.final_igb14.pos","ZEN3.ncu.final_igb14.pos"],
-            "cwd": "/Volumes/ROG/gmtplot_test/gpsplot",
+            "args": ["pygmt_config_psmap.yml"],
+            "cwd": "/Users/constantinevi/SAROP_NAS_II/ASPS/CECI_Taiwan_S1_A/PSI_20200112",
             "console": "integratedTerminal"
         }
     ]
