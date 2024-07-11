@@ -217,6 +217,28 @@ def config_xy(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Rat
         "CPT Range": Range,
         }
 
+def config_velo(LayerID, config, 
+                Plot=True, 
+                Data_Path = "",
+                Pen = "1p",
+                Color = "black",
+                Spec ="e0.1/0.39/18",
+                VectorSize = "12p",
+                VectorPosition = "E",
+                VectorFill =  None):
+    config["Layer"+str(LayerID)] = {
+        "Layer": "vector",
+        "Plot": Plot,
+        "File Path": str(Data_Path),
+        "Pen": Pen,
+        "Color": Color,
+        "Spec": Spec,
+        "Pen": Pen,
+        "Vector Size": VectorSize,
+        "Vector Position": VectorPosition,
+        "Vector Fill": VectorFill,
+        }
+
 def config_ogr(LayerID, config, Plot=True, Data_Path="",TS=False, Value=None, Ratio=1, Reference=None, Size=0.02, Type="c", Pen="", Fill="", CPT="jet", Range=[float(0)]):
     config["Layer"+str(LayerID)] = {
         "Layer": "ogr",
@@ -349,6 +371,28 @@ def config_PSV(config, Input=""):
     config_scale(NLayer, config, True, "RB", 0.5, 0.5, "RB", 10, "e", "t", 0, 0)
     NLayer += 1
 
+def config_GNSSV(config, Input=""):
+    DataInput = Path(Input)
+    if len(Input) == 0:
+        dataset = np.zeros([1,5])
+    else:
+        dataset = np.genfromtxt(Input, dtype=float, delimiter=",", ndmin=2).transpose()
+
+    NLayer = 0
+    config_basemap(config, float(np.round(min(dataset[0]),4)), float(np.round(max(dataset[0]),4)), float(np.round(min(dataset[1]),4)), float(np.round(max(dataset[1]),4)), "M", 15, 0, "c", "fancy")
+    NLayer += 1
+    config_image(NLayer, config)
+    NLayer += 1
+    config_velo(NLayer, config, True, DataInput)
+    # Link = NLayer
+    # NLayer += 1
+    # config_colorbar(NLayer, config, True, Link, "TL", 0.5, 0.5, 6, 0.5, "c", "TL", "v", 1, -1, "LOS Velocity (mm/year)", max(CPT_Range), 10)
+    NLayer += 1
+    config_compass(NLayer, config, True, "LT", 0.5, 0.5, 1, 0, "c", 0, 0)
+    NLayer += 1
+    config_scale(NLayer, config, True, "RB", 0.5, 0.5, "RB", 10, "e", "t", 0, 0)
+    NLayer += 1
+
 def config_PSTS(config):
     DataInput = Path(f".")
     ListData = []
@@ -457,6 +501,10 @@ def config_generate(Path_config, Type):
             NPlot = "Plot" + str(i + 1)
             config_GNSS(Plot, i)
             Config[NPlot] = Plot
+    elif Type == "gpsv":
+        Plot = {}
+        config_GNSSV(Plot, "gnss_v.csv")
+        Config["Plot1"] = Plot
     else:
         config_basemap(Plot)
         config_image(1, Plot)
@@ -835,6 +883,32 @@ def plot_xy(fig, Layer, Dataset = 0, Code=[]):
         Code.append(f"X={X}")
         Code.append(f"Y={Y[it]}")
         Code.append(f"fig.plot(x=X,y=Y,style=\"{Style}\",pen=\"{Pen}\",size=\"{Size}\",cmap=\"{CMap}\",fill=\"{Fill}\")")
+
+# 繪製箭頭向量物件
+def plot_velo(fig, Layer, Code=[]):
+    Input = Layer['File Path']
+    Pen = Layer.get("Pen", "1p")
+    Color = Layer.get("Color", "black")
+    Spec = Layer.get("Spec", "e0.1/0.39/18")
+    VectorSize = Layer.get("Vector Size", "12p")
+    VectorPosition = Layer.get("Vector Position", "E")
+    VectorFill = Layer.get("Vector Fill", None)
+    if Debug:
+        print(type(Input))
+    arrData = np.genfromtxt(Input, dtype=str,delimiter=",", ndmin=2).astype(float)
+    Pen = Pen + "," + Color
+    if VectorPosition == "B":
+        VectorPosition = "+b"
+    elif VectorPosition == "E":
+        VectorPosition = "+e"
+    else:
+        VectorPosition = "+b+e"
+    if VectorFill is None:
+        VectorFill = Color
+    Vector = VectorSize + VectorPosition + "+g" + VectorFill
+    fig.velo(arrData,pen=Pen,line=True,spec=Spec,vector=Vector)
+    fig.plot(x=np.min(arrData.transpose()[0]), y=np.min(arrData.transpose()[1]), style="v0.6c+e", direction=([0], [5]), pen="2p", fill="red3",  offset="0.2c/0.2c")
+    # fig.legend(spec="v0.6c+e",position="JTR+jTR+o0.2c", box=True)
 
 # 繪製向量物件
 def plot_ogr(fig, Layer, Code=[]):
@@ -1277,6 +1351,8 @@ def plot(config):
                     plot_xy(fig, Layer, Dataset, Code = Code)
                 elif Layer['Layer'] == "ogr":
                     plot_ogr(fig, Layer, Code = Code)
+                elif Layer['Layer'] == "vector":
+                    plot_velo(fig, Layer, Code = Code)
                 elif Layer['Layer'] == "colorbar":
                     plot_colorbar(fig, Layer, Plot[Layer['Link']],Code = Code)
                 elif Layer['Layer'] == "text":
