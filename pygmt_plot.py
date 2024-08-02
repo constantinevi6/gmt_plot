@@ -975,7 +975,7 @@ def plot_colorbar(
     Box_Transparency = Layer['Box Transparency']
     CMap = Layer["CPT"]
     Series = Layer["CPT Range"]
-    if LinkLayer != 0:
+    if LinkLayer != None:
         CMap = LinkLayer["CPT"]
         Series = LinkLayer["CPT Range"]
     Frame = [""]
@@ -1354,7 +1354,7 @@ def plot(config):
                 elif Layer['Layer'] == "vector":
                     plot_velo(fig, Layer, Code = Code)
                 elif Layer['Layer'] == "colorbar":
-                    plot_colorbar(fig, Layer, Plot[Layer['Link']],Code = Code)
+                    plot_colorbar(fig, Layer, Plot.get(Layer.get("Link", None), None),Code = Code)
                 elif Layer['Layer'] == "text":
                     plot_text(fig, Layer,Code = Code)
                 elif Layer['Layer'] == "scale":
